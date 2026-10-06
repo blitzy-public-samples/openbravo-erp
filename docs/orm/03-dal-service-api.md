@@ -541,7 +541,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalLockingTest.java` — `DalLockin
 
 ### OBCriteria constructors
 
-The four constructors pass their arguments to the matching `CriteriaImpl` constructor, and the two without a `SessionImplementor` use the default-pool session from `SessionHandler#getSession()` (`OBCriteria#OBCriteria(String)`, `OBCriteria#OBCriteria(String, String)`). None of them sets the entity that `OBCriteria#initialize` reads through `OBCriteria#getEntity()`; the `OBDal#createCriteria` overloads set it through the package-private `setEntity` (`OBDal#createCriteria(Class)`).
+The four constructors pass their arguments to the matching `CriteriaImpl` constructor, and the two without a `SessionImplementor` use the default-pool session from `SessionHandler#getSession()` (`OBCriteria#OBCriteria(String)`, `OBCriteria#OBCriteria(String, String)`). None of them sets the entity that `OBCriteria#initialize` reads through `OBCriteria#getEntity()`; the `OBDal#createCriteria` overloads set it through the package-private `setEntity` (`OBDal#createCriteria(Class)`). A criteria built directly by one of these constructors therefore throws from its executing methods while the default switches are on: outside admin mode `OBCriteria#initialize` passes the null entity to `EntityAccessChecker#checkReadable(Entity)`, which, once the checker is initialized, throws `OBSecurityException` unless the checker counts null among its readable or [derived readable](./05-glossary.md#derived-readable) entities, and whenever a filter switch is on `OBCriteria#initialize` dereferences the null entity and throws `NullPointerException` (`OBCriteria#initialize`, `EntityAccessChecker#checkReadable(Entity)`).
 
 #### `OBCriteria#OBCriteria(String)`
 
@@ -610,7 +610,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalTest.java` — `DalTest#testLCas
 
 `public ScrollableResults scroll() throws HibernateException`
 
-Marks the criteria as scrolling, calls `OBCriteria#initialize`, returns the superclass `scroll()` result as `ScrollableResults` (boundary), and clears the mark in a `finally` block (`OBCriteria#scroll()`). While the mark is set, `OBCriteria#getEntityOrClassName()` returns the entity name (`OBCriteria#getEntityOrClassName()`).
+Marks the criteria as scrolling, calls `OBCriteria#initialize`, returns the superclass `scroll()` result as `ScrollableResults` (boundary), and clears the mark in a `finally` block (`OBCriteria#scroll()`). While the mark is set and an entity is set, `OBCriteria#getEntityOrClassName()` returns the entity name, and otherwise it returns the superclass value (`OBCriteria#getEntityOrClassName()`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -1286,6 +1286,6 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public static final String CONFIG_FILE_NAME = "provider-config.xml";`
 
-Holds the [provider configuration](./05-glossary.md#provider-configuration) file name `provider-config.xml`, and no method declared in `OBProvider` reads it (`OBProvider#CONFIG_FILE_NAME`). The protected `OBProvider#register(String, InputStream)` and `OBProvider#register(String, String)`, which their source comments mark as used by `OBConfigFileProvider` (boundary), hand provider configuration to `OBProviderConfigReader` (boundary) (`OBProvider#register(String, String)`).
+Holds the [provider configuration](./05-glossary.md#provider-configuration) file name `provider-config.xml` (`OBProvider#CONFIG_FILE_NAME`). Neither configuration registration method reads it: the protected `OBProvider#register(String, InputStream)` receives the configuration as a stream, and the protected `OBProvider#register(String, String)` receives a file name as its `configFile` argument (`OBProvider#CONFIG_FILE_NAME`, `OBProvider#register(String, InputStream)`, `OBProvider#register(String, String)`). Each creates an `OBProviderConfigReader` (boundary) and hands it a prefix together with the stream or the file name, and their source comments mark both as used by `OBConfigFileProvider` (boundary) (`OBProvider#register(String, InputStream)`, `OBProvider#register(String, String)`).
 
 No src-test usage found in org.openbravo.test.dal.
