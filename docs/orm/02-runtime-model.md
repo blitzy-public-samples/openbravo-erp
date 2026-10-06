@@ -6,7 +6,9 @@ This file is for Java developers who extend Openbravo modules and need to know h
 
 Read the five files in this order: [01-architecture.md](./01-architecture.md), then this file, then [03-dal-service-api.md](./03-dal-service-api.md), [04-security-and-filtering.md](./04-security-and-filtering.md) and [05-glossary.md](./05-glossary.md). Previous: [01-architecture.md](./01-architecture.md). Next: [03-dal-service-api.md](./03-dal-service-api.md).
 
-Every behavioural statement ends with a `Class#method` citation; class names resolve through the table below. A note that opens with **Ambiguity:** records a place where the Javadoc or a comment and the method body disagree; this documentation states both readings and does not resolve them. Classes that appear only as names, such as the AD model classes `Table` and `Column`, `NamingUtil`, `OBClassLoader`, `IdentifierProvider` and the [domain type](./05-glossary.md#domain-type) classes, are boundary classes whose internals are not documented.
+Every behavioural statement ends with a `Class#method` citation; class names resolve through the Sources table below. A note that opens with **Ambiguity:** records a place where the Javadoc or a comment and the method body disagree; this documentation states both readings and does not resolve them. Classes that appear only as names, such as the AD model classes `Table` and `Column`, `NamingUtil`, `OBClassLoader`, `IdentifierProvider` and the [domain type](./05-glossary.md#domain-type) classes, are boundary classes whose internals are not documented.
+
+Sources: every class cited in this file resolves to the path below.
 
 | Class | Repository path |
 |-------|-----------------|
@@ -343,7 +345,10 @@ classDiagram
   Serializable <|.. BaseOBObject
   BaseOBObject --> "1" Entity : getEntity
   Entity "1" --> "*" Property : getProperties
-  note "Classes passed to OBDal createCriteria(Class) must satisfy its bound T extends BaseOBObject. The concrete generated structure is unavailable because SystemInformation is Not Found."
+  note "Classes passed to OBDal createCriteria(Class)
+  must satisfy its bound T extends BaseOBObject.
+  The concrete generated structure is unavailable
+  because SystemInformation is Not Found."
 ```
 
 Diagram sources: the five realization edges are declared supertypes from the `implements` clause of `BaseOBObject`, whose `BaseOBObject#get(String)`, `BaseOBObject#set(String, Object)`, `BaseOBObject#getEntity`, `BaseOBObject#getId`, `BaseOBObject#setId`, `BaseOBObject#getIdentifier` and `BaseOBObject#getEntityName` provide the interface members (`BaseOBObject#get(String)`, `BaseOBObject#set(String, Object)`, `BaseOBObject#getEntity`, `BaseOBObject#getId`, `BaseOBObject#setId`, `BaseOBObject#getIdentifier`, `BaseOBObject#getEntityName`). The association to `Entity` is `BaseOBObject#getEntity`, one entity per object (`BaseOBObject#getEntity`). The association to `Property` is `Entity#getProperties`, drawn as `*` because `ModelProvider#removeInvalidTables` requires a primary-key column only for table-based tables (`Entity#getProperties`, `ModelProvider#removeInvalidTables`). The note cites the bound on `OBDal#createCriteria(Class)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obdalcreatecriteriaclass)) and the Not Found record in [Worked example: SystemInformation](#worked-example-systeminformation) (`OBDal#createCriteria(Class)`, `GenerateEntitiesTask#execute`). No edge is drawn for generated classes or `DynamicOBObject` (`GenerateEntitiesTask#execute`, `Entity#getMappingClass`).
