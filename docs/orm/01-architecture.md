@@ -55,38 +55,59 @@ The runtime packages form these layers, grouped by the package in each class dec
 - Security, package `org.openbravo.dal.security`: the DAL calls these checks from its own methods; for example, outside [admin mode](./05-glossary.md#admin-mode) `OBDal#save(Object)` calls `EntityAccessChecker#checkWritable` and `SecurityChecker#checkWriteAccess(Object)` before `SessionHandler#save(String, Object)` (`OBDal#save(Object)`). Owner: [04-security-and-filtering.md, Access checks](./04-security-and-filtering.md#access-checks).
 
 ```mermaid
+---
+config:
+  flowchart:
+    useMaxWidth: false
+---
 flowchart LR
   subgraph gen["org.openbravo.base.gen (development time)"]
-    GET["GenerateEntitiesTask#execute"]
+    GET["`GenerateEntitiesTask
+    #execute`"]
   end
   subgraph model["org.openbravo.base.model"]
-    MPG["ModelProvider#getModel"]
-    MPI["ModelProvider#initialize"]
+    MPG["`ModelProvider
+    #getModel`"]
+    MPI["`ModelProvider
+    #initialize`"]
     MSFC["ModelSessionFactoryController"]
   end
   subgraph provider["org.openbravo.base.provider"]
-    OBPG["OBProvider#get(Class)"]
+    OBPG["`OBProvider
+    #get(Class)`"]
   end
   subgraph core["org.openbravo.dal.core"]
-    DSFCM["DalSessionFactoryController#mapModel"]
-    DSFCI["DalSessionFactoryController#setInterceptor"]
-    DMG["DalMappingGenerator#generateMapping()"]
+    DSFCM["`DalSessionFactoryController
+    #mapModel`"]
+    DSFCI["`DalSessionFactoryController
+    #setInterceptor`"]
+    DMG["`DalMappingGenerator
+    #generateMapping()`"]
     OBI["OBInterceptor"]
-    SHG["SessionHandler#getSession(String)"]
-    SHS["SessionHandler#save(String, Object)"]
+    SHG["`SessionHandler
+    #getSession(String)`"]
+    SHS["`SessionHandler
+    #save(String, Object)`"]
   end
   subgraph service["org.openbravo.dal.service"]
-    ODI["OBDal#getInstance()"]
-    ODG["OBDal#getSession"]
-    ODQ["OBDal#createQuery"]
-    ODC["OBDal#createCriteria"]
-    ODS["OBDal#save(Object)"]
+    ODI["`OBDal
+    #getInstance()`"]
+    ODG["`OBDal
+    #getSession`"]
+    ODQ["`OBDal
+    #createQuery`"]
+    ODC["`OBDal
+    #createCriteria`"]
+    ODS["`OBDal
+    #save(Object)`"]
     OQ["OBQuery"]
     OC["OBCriteria"]
   end
   subgraph security["org.openbravo.dal.security"]
-    EAC["EntityAccessChecker#checkWritable"]
-    SC["SecurityChecker#checkWriteAccess(Object)"]
+    EAC["`EntityAccessChecker
+    #checkWritable`"]
+    SC["`SecurityChecker
+    #checkWriteAccess(Object)`"]
   end
   GET --> MPG
   MPG --> MPI
@@ -130,15 +151,15 @@ In the method bodies the delegate opens the session before any session informati
 ```mermaid
 flowchart LR
   INIT["DalRequestFilter#init"] --> ORCH["startup orchestration (DalLayerInitializer / SessionFactoryController, boundary)"]
-  AD["Application Dictionary"] -.->|dependency| RM["runtime model: ModelProvider#getModel, ModelProvider#refresh"]
-  RM -.->|dependency| MAP["Hibernate mapping: DalSessionFactoryController#mapModel registers DalMappingGenerator#generateMapping()"]
-  MAP -.->|dependency| SF["session factory: DalSessionFactoryController#setInterceptor, DalSessionFactory#setDelegateSessionFactory"]
+  AD["Application Dictionary"] -.->|dependency| RM["runtime model"]
+  RM -.->|dependency| MAP["Hibernate mapping"]
+  MAP -.->|dependency| SF["session factory"]
   NOTE["Note: the invocation order of these stages inside the boundary node is not specified"]
   classDef boundary stroke-dasharray: 4 4
   class ORCH boundary
 ```
 
-Diagram sources: the solid edge is an observed call, `DalRequestFilter#init` calling `DalLayerInitializer.getInstance().initialize(true)` (`DalRequestFilter#init`). The node "startup orchestration" is a boundary orchestration node for `DalLayerInitializer`, which `DalRequestFilter#init` calls, and `SessionFactoryController`, whose `mapModel`, `setInterceptor` and `getSQLFunctions` `DalSessionFactoryController` overrides; it has no internal edges and claims no order (`DalRequestFilter#init`, `DalSessionFactoryController#mapModel`). The dotted edges labelled "dependency" are conceptual dependencies, not calls (`ModelProvider#getModel`, `DalMappingGenerator#generateMapping()`, `DalSessionFactoryController#mapModel`). The runtime model is built from the Application Dictionary by `ModelProvider#getModel` and `ModelProvider#refresh` (`ModelProvider#getModel`, `ModelProvider#refresh`). The mapping needs the runtime model because `DalMappingGenerator#generateMapping()` iterates `ModelProvider#getModel`, and the `DalSessionFactoryController` class Javadoc states that the controller is initialized after the model has been read into memory (`DalMappingGenerator#generateMapping()`, `DalSessionFactoryController#mapModel`). The session factory needs the mapping because the `DalSessionFactoryController` class Javadoc describes the controller as the class that initializes and provides the session factory of the runtime DAL, and states that `DalMappingGenerator` generates the Hibernate mapping for the runtime model (`DalSessionFactoryController#mapModel`). The session factory stage node names `DalSessionFactoryController#setInterceptor`, which installs a new `OBInterceptor` on the Hibernate `Configuration` it receives, and `DalSessionFactory#setDelegateSessionFactory`, which receives the Hibernate factory that `DalSessionFactory` delegates to (`DalSessionFactoryController#setInterceptor`, `DalSessionFactory#setDelegateSessionFactory`). The unconnected note node records that the invocation order inside the boundary is not specified (`DalRequestFilter#init`, `DalSessionFactoryController#mapModel`).
+Diagram sources: the solid edge is an observed call, `DalRequestFilter#init` calling `DalLayerInitializer.getInstance().initialize(true)` (`DalRequestFilter#init`). The node "startup orchestration" is a boundary orchestration node for `DalLayerInitializer`, which `DalRequestFilter#init` calls, and `SessionFactoryController`, whose `mapModel`, `setInterceptor` and `getSQLFunctions` `DalSessionFactoryController` overrides; it has no internal edges and claims no order (`DalRequestFilter#init`, `DalSessionFactoryController#mapModel`). The dotted edges labelled "dependency" are conceptual dependencies, not calls (`ModelProvider#getModel`, `DalMappingGenerator#generateMapping()`, `DalSessionFactoryController#mapModel`). The runtime model stage stands for `ModelProvider#getModel` and `ModelProvider#refresh`, which build the runtime model from the Application Dictionary (`ModelProvider#getModel`, `ModelProvider#refresh`). The Hibernate mapping stage stands for `DalSessionFactoryController#mapModel`, which registers the mapping produced by `DalMappingGenerator#generateMapping()` (`DalSessionFactoryController#mapModel`). The mapping needs the runtime model because `DalMappingGenerator#generateMapping()` iterates `ModelProvider#getModel`, and the `DalSessionFactoryController` class Javadoc states that the controller is initialized after the model has been read into memory (`DalMappingGenerator#generateMapping()`, `DalSessionFactoryController#mapModel`). The session factory needs the mapping because the `DalSessionFactoryController` class Javadoc describes the controller as the class that initializes and provides the session factory of the runtime DAL, and states that `DalMappingGenerator` generates the Hibernate mapping for the runtime model (`DalSessionFactoryController#mapModel`). The session factory stage stands for `DalSessionFactoryController#setInterceptor`, which installs a new `OBInterceptor` on the Hibernate `Configuration` it receives, and `DalSessionFactory#setDelegateSessionFactory`, which receives the Hibernate factory that `DalSessionFactory` delegates to (`DalSessionFactoryController#setInterceptor`, `DalSessionFactory#setDelegateSessionFactory`). The unconnected note node records that the invocation order inside the boundary is not specified (`DalRequestFilter#init`, `DalSessionFactoryController#mapModel`).
 
 ## Hibernate mapping generation
 
@@ -210,11 +231,10 @@ flowchart TD
     SGE -->|depends| CSG["src/build.xml#clean.src.gen"]
     SGE -->|depends| GEQ["src/build.xml#generate.entities.quick"]
     GEQ -->|depends| CSRC["src/build.xml#compile.src.gen"]
-    GEQ -->|java| MAIN["GenerateEntitiesTask#main"]
     GEQ -->|javac| JAVAC["compile the generated sources in src-gen"]
   end
   subgraph task["GenerateEntitiesTask#main and GenerateEntitiesTask#execute"]
-    MAIN --> EXEC["GenerateEntitiesTask#execute"]
+    MAIN["GenerateEntitiesTask#main"] --> EXEC["GenerateEntitiesTask#execute"]
     EXEC --> HC{"GenerateEntitiesTask#hasChanged"}
     HC -->|false| STOP["log Model has not changed, return"]
     HC -->|true| TPL["GenerateEntitiesTask#createTemplateImplementation for entity.ftl and entityComputedColumns.ftl"]
@@ -237,8 +257,9 @@ flowchart TD
     WCC -->|IOException opening or closing the file| LOGC["log Error generating file for the companion class"]
     LOGC --> NEXT
     WRITE -->|IOException or TemplateException while processing| ISE2["IllegalStateException propagates"]
-    WCC -->|IOException or TemplateException while processing| ISE2
+    WCC -->|IOException or TemplateException while processing| ISE3["IllegalStateException propagates"]
   end
+  GEQ -->|java| MAIN
 ```
 
 Diagram sources: the build part uses Ant edges only, each labelled with its kind (`build.xml#generate.entities`, `src/build.xml#generate.entities`, `src/build.xml#generate.entities.quick`). The edge labelled "ant" is the `<ant dir="${base.src}" target="generate.entities">` delegation in the root target (`build.xml#generate.entities`). The edges labelled "depends" come from the `depends` attributes of the full target (`clean.src.gen`, `generate.entities.quick`) and of the quick target (`compile.src.gen`), which Ant runs before the target body (`src/build.xml#generate.entities`, `src/build.xml#generate.entities.quick`). The edges labelled "java" and "javac" are the task elements in the body of the quick target, the `<java>` element first and the two `javac` elements after it (`src/build.xml#generate.entities.quick`). The task part is control flow, starting with the call from `GenerateEntitiesTask#main` to `GenerateEntitiesTask#execute` (`GenerateEntitiesTask#main`). `GenerateEntitiesTask#execute` calls `GenerateEntitiesTask#hasChanged` and logs and returns when it is false, loads both templates through `GenerateEntitiesTask#createTemplateImplementation`, and calls `ModelProvider#getModel` and `ModelProvider#addHelpAndDeprecationToModel` (`GenerateEntitiesTask#execute`). It then loops over the returned entity list: it skips entities for which `Entity#isDataSourceBased()` or `Entity#isHQLBased()` is true, writes the main class only when `Entity#isVirtualEntity()` is false, and writes the companion class when `Entity#hasComputedColumns()` is true, both through `GenerateEntitiesTask#processTemplate` (`GenerateEntitiesTask#execute`). An `IOException` while opening or closing the main class file is caught and logged, and the same entity's `Entity#hasComputedColumns()` check follows (`GenerateEntitiesTask#execute`). The same failure for the companion class file is caught and logged, and the loop moves on to the next entity (`GenerateEntitiesTask#execute`). After the loop it logs the number of entities in the model list (`GenerateEntitiesTask#execute`). The `IllegalStateException` edges are the wrapping `catch` blocks of `GenerateEntitiesTask#createTemplateImplementation` and `GenerateEntitiesTask#processTemplate`, which `GenerateEntitiesTask#execute` does not catch (`GenerateEntitiesTask#createTemplateImplementation`, `GenerateEntitiesTask#processTemplate`, `GenerateEntitiesTask#execute`).
@@ -257,6 +278,15 @@ For every request the filter is mapped to, servlet code that a module adds runs 
 - Left unspecified: which `SessionHandler` methods the boundary handler calls during cleanup, and in what order, is not shown by any in-scope code (`DalRequestFilter#doFilter`, `SessionHandler#setDoRollback(boolean)`).
 
 ```mermaid
+---
+config:
+  fontFamily: '"Recursive Variable", arial, sans-serif'
+  sequence:
+    wrap: true
+    useMaxWidth: false
+    width: 170
+    actorMargin: 85
+---
 sequenceDiagram
   participant F as DalRequestFilter (anonymous handler in doFilter)
   participant DTH as DalThreadHandler (boundary)
