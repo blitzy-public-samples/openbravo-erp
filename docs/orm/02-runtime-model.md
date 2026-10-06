@@ -81,11 +81,11 @@ The AD model classes named above are boundary names: this documentation does not
 flowchart TD
   s1["ModelProvider#initialize()"] --> s2["new ModelSessionFactoryController"]
   s2 --> s3["initializeReferenceClasses: load each reference implementation class"]
-  s3 --> d1{"class is a BaseDomainType?"}
+  s3 --> d1{"class is a BaseDomainType (boundary)?"}
   d1 -->|"yes"| s4["addAdditionalClasses for every class from getClasses()"]
   d1 -->|"no"| s5
   s4 --> s5["openSession and beginTransaction"]
-  s5 --> s6["read Table (sorted by name), Reference, Column, RefTable, RefSearch, RefList, active Module"]
+  s5 --> s6["read Table (boundary) sorted by name, Reference (boundary), Column (boundary), RefTable (boundary), RefSearch (boundary), RefList (boundary), active Module (boundary)"]
   s6 --> s7["removeInvalidTables: drop table-based tables without primary-key columns"]
   s7 --> d2{"data origin is Table?"}
   d2 -->|"yes"| s8["index by table name"]
@@ -99,20 +99,34 @@ flowchart TD
   s12 --> s13["setVirtualPropertiesForReferenceId"]
   s13 --> s14["buildUniqueConstraints"]
   s14 --> s15["getColumnMandatories"]
-  s15 --> s16["Property#initializeName and database mandatory flag for properties that are not one-to-many"]
-  s16 --> d4{"entity is datasource-based or HQL-based?"}
+  s15 --> s16["Property#initializeName for every property that is not one-to-many"]
+  s16 --> d6{"entity is not a view, datasource-based, HQL-based or virtual, and the property has a column name?"}
+  d6 -->|"yes"| d7{"database not-null value found for the column?"}
+  d6 -->|"no"| s25
+  d7 -->|"yes"| s23["Property#setMandatory with the database not-null value"]
+  d7 -->|"no"| d8{"property is a computed column or a proxy?"}
+  d8 -->|"no"| s24["log a warning that the mandatory setting is not in the database metadata"]
+  d8 -->|"yes"| s25
+  s23 --> s25["read hb.generate.all.parent.child.properties through OBPropertiesProvider (boundary)"]
+  s24 --> s25
+  s25 --> d9{"setting is true?"}
+  d9 -->|"yes"| s26["log warnings: all children properties are generated, and properties from columns flagged as not generating a child property in the parent entity are deprecated"]
+  d9 -->|"no"| d4{"entity is datasource-based or HQL-based?"}
+  s26 --> d4
   d4 -->|"no"| s17["createPropertyInParentEntity"]
   d4 -->|"yes"| s20
   s17 --> d5{"shouldGenerateChildPropertyInParent?"}
   d5 -->|"yes"| s18["createChildProperty on the parent entity"]
-  d5 -->|"no, but yes under the all setting"| s19["setBeingReferenced(true)"]
+  d5 -->|"no"| d10{"all setting is false and shouldGenerateChildPropertyInParent under the all setting?"}
+  d10 -->|"yes"| s19["setBeingReferenced(true)"]
+  d10 -->|"no: skip the property (continue)"| s20
   s18 --> s20["Property#initializeName for one-to-many properties; record image and file entities"]
   s19 --> s20
   s20 --> s21["setTranslatableColumns"]
   s21 --> s22["finally: commit, close session, close model session factory"]
 ```
 
-Diagram sources: every node is a control-flow step and every edge is execution order inside `ModelProvider#initialize`, except decision `d1` and step `s4`, which are the loop body of `ModelProvider#initializeReferenceClasses`, step `s7`, which is `ModelProvider#removeInvalidTables`, decision `d5` and step `s19`, which are the loop body of `ModelProvider#createPropertyInParentEntity`, and step `s18`, which is `ModelProvider#createChildProperty`; the per-table and per-entity loops are drawn as single steps, and `s10` and `s11` cite `Entity#initialize(Table)` and `Entity#initializeComputedColumns`.
+Diagram sources: every node is a control-flow step and every edge is execution order inside `ModelProvider#initialize`, except the nodes and edges that the following sentences assign to another method's body (`ModelProvider#initialize`). Decision `d1` and step `s4` are the loop body of `ModelProvider#initializeReferenceClasses` (`ModelProvider#initializeReferenceClasses`). Step `s7` is `ModelProvider#removeInvalidTables` (`ModelProvider#removeInvalidTables`). Decisions `d5` and `d10` and step `s19` are the loop body of `ModelProvider#createPropertyInParentEntity`, where both decisions evaluate `ModelProvider#shouldGenerateChildPropertyInParent` (`ModelProvider#createPropertyInParentEntity`, `ModelProvider#shouldGenerateChildPropertyInParent`). Step `s19` and the `d10` "no" edge both skip to the next property, and every exit of the `ModelProvider#createPropertyInParentEntity` loop body joins `s20` (`ModelProvider#createPropertyInParentEntity`, `ModelProvider#initialize`). Step `s18` is `ModelProvider#createChildProperty` (`ModelProvider#createChildProperty`). Decisions `d6`, `d7` and `d8` and steps `s23` and `s24` follow `s16` in the same per-property loop body of `ModelProvider#initialize`, where `s23` is the call to `Property#setMandatory` and every exit of that body joins `s25` (`ModelProvider#initialize`). Steps `s25` and `s26` and decision `d9` are the read of the "all" setting and its warnings in `ModelProvider#initialize`, which runs before the per-entity `ModelProvider#createPropertyInParentEntity` calls (`ModelProvider#initialize`). The per-table, per-entity and per-property loops are each drawn once (`ModelProvider#initialize`, `ModelProvider#createPropertyInParentEntity`). Step `s10` cites `Entity#initialize(Table)` and step `s11` cites `Entity#initializeComputedColumns`, the entity initializers that `ModelProvider#initialize` calls at those points (`ModelProvider#initialize`, `Entity#initialize(Table)`, `Entity#initializeComputedColumns`). `BaseDomainType` in `d1` is a boundary name only, cited through `ModelProvider#initializeReferenceClasses`, which checks each loaded class against it (`ModelProvider#initializeReferenceClasses`). The AD model classes in `s6` are boundary names only, cited through `ModelProvider#initialize`, which reads them, and `ModelSessionFactoryController#mapModel`, which maps them (`ModelProvider#initialize`, `ModelSessionFactoryController#mapModel`). `OBPropertiesProvider` in `s25` is a boundary name only, cited through `ModelProvider#initialize`, which reads the "all" setting through it (`ModelProvider#initialize`).
 
 ### Help and deprecation loading
 
