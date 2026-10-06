@@ -275,7 +275,7 @@ The flag is set in two stages: `Property#initializeFromColumn` copies the AD col
 
 Whether a class tagged with `OBNotSingleton` is a [singleton](./05-glossary.md#singleton) is ambiguous in the code; [the OBDal#getInstance() entry in 03-dal-service-api.md](./03-dal-service-api.md#obdalgetinstance) documents the method itself (`OBDal#getInstance`).
 
-> **Ambiguity:** The Javadoc of `OBNotSingleton` reads "Tags a class as being a singleton", while `OBProvider#register(String, Class, boolean)` decides whether a registration is a singleton only from whether the class implements `OBSingleton`; `OBDal` implements `OBNotSingleton`, yet `OBDal#getInstance()` caches a static instance that it obtains once from `OBProvider#get(Class)` (`OBProvider#register(String, Class, boolean)`, `OBDal#getInstance`). This documentation does not resolve the difference.
+> **Ambiguity:** The Javadoc of `OBNotSingleton` reads "Tags a class as being a singleton", while `OBProvider#register(String, Class, boolean)` decides whether a registration is a singleton only from whether the class implements `OBSingleton`; `OBDal` implements `OBNotSingleton`, yet `OBDal#getInstance()` caches a static instance, keeping the instance it obtains from `OBProvider#get(Class)` in a static field whenever that field is null (`OBProvider#register(String, Class, boolean)`, `OBDal#getInstance`). This documentation does not resolve the difference.
 
 ### Values, identity and the new-object flag
 

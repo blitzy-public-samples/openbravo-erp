@@ -42,7 +42,7 @@ The inventory therefore holds 102 entries: 35 for `OBDal`, 21 for `OBCriteria` (
 
 Entry layout: each entry has a level-4 heading with the member's key, one line holding the signature copied from the source, behaviour sentences that each end with a `Class#method` citation, and exactly one example form. The example form is either a `java` block followed by a `Source:` line, or a line pointing to another entry of the same class whose block calls this member, or the sentence `No src-test usage found in org.openbravo.test.dal.` when no test in that package calls the member.
 
-Example rule: every `java` block is copied verbatim from the body of the test method, or test helper, that its `Source:` line names under `src-test/src/org/openbravo/test/dal/`. Indentation may differ and blank lines are dropped; a line holding only `// ...` marks omitted lines, and an excerpt may start after the method's first line or stop before its last. A helper's `Source:` line also names the test method that invokes it. [Generated classes](./05-glossary.md#generated-class) that appear inside excerpts, such as `Category` or `Currency`, belong to the test code and are not described here. Tests appear only as examples or, after a statement cited to DAL code, as illustrations.
+Example rule: every `java` block is copied verbatim from the body of the test method, or test helper, that its `Source:` line names under `src-test/src/org/openbravo/test/dal/`. Indentation may differ and blank lines are dropped; a line holding only `// ...` marks omitted lines, and an excerpt may start after the method's first line or stop before its last. A helper's `Source:` line also names the test method that invokes it. [Generated classes](./05-glossary.md#generated-class) that appear inside excerpts belong to the test code and are not described here. Tests appear only as examples or, after a statement cited to DAL code, as illustrations.
 
 Design reasons are stated only where the cited method's code, source comment or Javadoc states them. Where a method's Javadoc and its body disagree, an **Ambiguity** note gives both readings and leaves them unresolved. Signatures and citations carry no line numbers.
 
@@ -71,7 +71,7 @@ Diagram sources: observed calls (solid arrows): `OBDal#getInstance()` obtains it
 
 `public static OBDal getInstance()`
 
-Returns the instance for the default pool: on the first call it obtains an `OBDal` from `OBProvider#get(Class)`, sets its pool to `ExternalConnectionPool.DEFAULT_POOL` (boundary) and keeps it in a static field, and later calls return that instance (`OBDal#getInstance()`). How this cached instance relates to the `OBNotSingleton` interface that `OBDal` implements is recorded in [02-runtime-model.md#baseobobject-and-its-interfaces](./02-runtime-model.md#baseobobject-and-its-interfaces) (`OBDal#getInstance()`).
+Returns the instance for the default pool: whenever its static field is null, it obtains an `OBDal` from `OBProvider#get(Class)`, stores it in that field and sets its pool to `ExternalConnectionPool.DEFAULT_POOL` (boundary), and it returns the instance the field holds (`OBDal#getInstance()`). The null check is not synchronized, so the code makes no exactly-once or thread-safety promise for that instance (`OBDal#getInstance()`). How this cached instance relates to the `OBNotSingleton` interface that `OBDal` implements is recorded in [02-runtime-model.md#baseobobject-and-its-interfaces](./02-runtime-model.md#baseobobject-and-its-interfaces) (`OBDal#getInstance()`).
 
 Example: see [`OBDal#save(Object)`](#obdalsaveobject) (`DalTest#testCCreateBPGroup`).
 
@@ -535,7 +535,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalLockingTest.java` — `DalLockin
 
 ## OBCriteria
 
-`OBCriteria` extends Hibernate's `CriteriaImpl` (boundary), and its class Javadoc states the design: it adds transparent client and organization filtering to the Hibernate criteria, and it offers an order-by convenience method whose referenced entities are joined automatically (`OBCriteria#initialize`, `OBCriteria#addOrderBy(String, boolean)`). The executing methods first call the package-private `OBCriteria#initialize`, which outside admin mode runs `EntityAccessChecker#checkReadable(Entity)`, then adds the organization, client and active restrictions that the filter switches allow, the recorded order-by entries, and a query timeout through `QueryTimeOutUtil` (boundary) when `SessionInfo` (boundary) holds a query profile (`OBCriteria#initialize`). The restrictions are described in [04-security-and-filtering.md#client-organization-and-active-filtering](./04-security-and-filtering.md#client-organization-and-active-filtering) (`OBCriteria#initialize`).
+`OBCriteria` extends Hibernate's `CriteriaImpl` (boundary), and its class Javadoc states the design: it adds transparent client and organization filtering to the Hibernate criteria, and it offers an order-by convenience method whose referenced entities are joined automatically (`OBCriteria#initialize`, `OBCriteria#addOrderBy(String, boolean)`). The executing methods first call the package-private `OBCriteria#initialize`, which applies, each under its own condition, the read check `EntityAccessChecker#checkReadable(Entity)` and the client, organization and active restrictions, adds the recorded order-by entries, and sets a query timeout through `QueryTimeOutUtil` (boundary) when `SessionInfo` (boundary) holds a query profile (`OBCriteria#initialize`). [04-security-and-filtering.md#criteria-restrictions](./04-security-and-filtering.md#criteria-restrictions) describes when the read check and each restriction apply, and [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) describes the read check's failure (`OBCriteria#initialize`).
 
 ### OBCriteria constructors
 
@@ -649,7 +649,7 @@ Source: `src-test/src/org/openbravo/test/dal/ComputedColumnsTest.java` — `Comp
 
 Records an order-by entry, marks the criteria as modified and returns it for chaining (`OBCriteria#addOrderBy(String, boolean)`). `OBCriteria#initialize` turns each entry into an ascending or descending order; for a dotted path it creates an alias for the part before the last dot and orders on that alias, so the referenced entity is joined (`OBCriteria#initialize`).
 
-> **Ambiguity:** `OBCriteria#initialize` builds the join alias as `"order_ob_" + j` with `final int j = 0` declared inside the loop over the order-by entries, so every dotted path receives the same alias `order_ob_0`, although building the alias from a separate variable `j` reads as a per-entry counter (`OBCriteria#initialize`). No `org.openbravo.test.dal` test orders by two dotted paths, so whether a shared alias is intended is not shown (`OBCriteria#addOrderBy(String, boolean)`). These docs do not resolve it.
+> **Ambiguity:** `OBCriteria#initialize` builds the join alias as `"order_ob_" + j` with `final int j = 0` declared inside the loop over the order-by entries, so every dotted path receives the same alias `order_ob_0` (`OBCriteria#initialize`). No `org.openbravo.test.dal` test orders by two dotted paths, so whether a shared alias is intended is not shown (`OBCriteria#addOrderBy(String, boolean)`). These docs do not resolve it.
 
 ```java
 final OBCriteria<Product> obc = OBDal.getInstance().createCriteria(Product.class);
@@ -1203,9 +1203,9 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public void registerInstance(Class<?> registrationClass, Object instanceObj, boolean overwrite)`
 
-Calls `OBProvider#register(String, Class, boolean)` with the name of `registrationClass`, the class of `instanceObj` and `overwrite`, then sets `instanceObj` as the instance of the registration stored under that name, which `OBProvider#get(Class)` returns from then on (`OBProvider#registerInstance(Class, Object, boolean)`, `OBProvider.Registration#getInstance`).
+Calls `OBProvider#register(String, Class, boolean)` with the name of `registrationClass`, the class of `instanceObj` and `overwrite`, then sets `instanceObj` as the instance of the registration stored under that name (`OBProvider#registerInstance(Class, Object, boolean)`). Its Javadoc describes `instanceObj` as "the instance to use when the class is requested" (`OBProvider#registerInstance(Class, Object, boolean)`).
 
-> **Ambiguity:** The Javadoc of `OBProvider#registerInstance(Class, Object, boolean)` says that with `overwrite` false a current registration is not overwritten. The body sets `instanceObj` on whichever registration is stored under the name after `OBProvider#register(String, Class, boolean)` returns, and that call keeps an existing registration when `overwrite` is false or the existing one is not overwritable, so the kept registration still receives the new instance (`OBProvider#registerInstance(Class, Object, boolean)`, `OBProvider#register(String, Class, boolean)`). These docs do not resolve which behaviour is intended.
+> **Ambiguity:** The Javadoc of `OBProvider#registerInstance(Class, Object, boolean)` says that with `overwrite` false a current registration is not overwritten (`OBProvider#registerInstance(Class, Object, boolean)`). The body sets `instanceObj` on whichever registration is stored under the name after `OBProvider#register(String, Class, boolean)` returns, and that call keeps an existing registration when `overwrite` is false or the existing one is not overwritable, so the kept registration still receives the new instance (`OBProvider#registerInstance(Class, Object, boolean)`, `OBProvider#register(String, Class, boolean)`). These docs do not resolve which behaviour is intended.
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -1229,7 +1229,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public void removeInstance(Class<?> clz)`
 
-Clears the instance kept by the registration for `clz`, so that the next `OBProvider#get(Class)` creates a new one, and does nothing when `clz` is not registered (`OBProvider#removeInstance(Class)`, `OBProvider.Registration#getInstance`).
+Sets the instance of the registration stored under the name of `clz` to null; when `clz` is not registered, it writes a debug log entry and returns without changing the registry (`OBProvider#removeInstance(Class)`). Its Javadoc describes this as removing the singleton instance of `clz`, if any, from the internal registry, and states that the instance will be recreated at the next request (`OBProvider#removeInstance(Class)`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -1239,7 +1239,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public <T extends Object> T get(Class<T> clz)`
 
-Returns the instance of the registration stored under the name of `clz`; when there is none, it first registers `clz` as its own implementation through `OBProvider#register(Class, Class, boolean)` with `overwrite` false (`OBProvider#get(Class)`). The registration returns an instance set through `OBProvider#registerInstance(Class, Object, boolean)` when there is one; otherwise it creates an instance with the no-argument constructor, keeps it only for a singleton registration, and wraps instantiation failures in `OBProviderException` (`OBProvider.Registration#getInstance`).
+Returns the instance of the registration stored under the name of `clz`; when there is none, it first registers `clz` as its own implementation through `OBProvider#register(Class, Class, boolean)` with `overwrite` false (`OBProvider#get(Class)`). Its Javadoc states that the method checks the registry for which class should be used for the passed `clz`, that a new registration using `clz` is created when none is found, and that it returns an instance of `clz` (`OBProvider#get(Class)`).
 
 ```java
 final Category bpg = OBProvider.getInstance().get(Category.class);
@@ -1266,7 +1266,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 Removes one leading and one trailing `/` from `path`, splits the rest at `/`, and looks up the registrations for the joined segments from the full path down to the first segment alone, returning the instance of the first registration found; it throws `OBProviderException` when none is found (`OBProvider#getMostSpecificService(String)`).
 
-> **Ambiguity:** The Javadoc of `OBProvider#getMostSpecificService(String)` lists the names it checks with a leading `/`, with a trailing `/` on the shorter ones, and stops at the first two segments, while the body looks up names without a leading or trailing `/` and continues down to the first segment alone (`OBProvider#getMostSpecificService(String)`). These docs do not resolve which form registrations are expected to use.
+> **Ambiguity:** The Javadoc of `OBProvider#getMostSpecificService(String)` lists the names it checks with a leading `/`, with a trailing `/` on the shorter ones, and stops at the first two segments (`OBProvider#getMostSpecificService(String)`). The body removes only one leading and one trailing `/` from `path` and makes no other change to it before splitting it at `/`, so for the Javadoc's example path it looks up names without a leading or trailing `/` and continues down to the first segment alone (`OBProvider#getMostSpecificService(String)`). These docs do not resolve which form registrations are expected to use.
 
 No src-test usage found in org.openbravo.test.dal.
 
