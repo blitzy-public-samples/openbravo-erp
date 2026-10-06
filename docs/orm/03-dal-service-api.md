@@ -205,7 +205,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public void commitAndClose()`
 
-When the current thread's `SessionHandler` is present and available for this instance's pool (`SessionHandler#isSessionHandlerPresent(String)`), it calls `SessionHandler#commitAndClose(String)`; otherwise it does nothing (`OBDal#commitAndClose()`). That method fails while triggers are disabled through `TriggerHandler` (boundary), repeats a [flush](./05-glossary.md#flush) of the session while it is dirty, commits the transaction and closes the session, as described in [01-architecture.md#sessions-and-transactions](./01-architecture.md#sessions-and-transactions) (`SessionHandler#commitAndClose(String)`).
+When the current thread's `SessionHandler` is present and available for this instance's pool (`SessionHandler#isSessionHandlerPresent(String)`), it calls `SessionHandler#commitAndClose(String)`; otherwise it does nothing (`OBDal#commitAndClose()`). What that method checks, commits and closes, including its [flush](./05-glossary.md#flush) loop and the paths that skip the commit, is owned by [01-architecture.md#commit-rollback-and-flush](./01-architecture.md#commit-rollback-and-flush) (`SessionHandler#commitAndClose(String)`).
 
 Example: see [`OBDal#get(Class, Object)`](#obdalgetclass-object) (`DalTest#testASaveBooleanValue1`).
 
@@ -213,7 +213,7 @@ Example: see [`OBDal#get(Class, Object)`](#obdalgetclass-object) (`DalTest#testA
 
 `public void rollbackAndClose()`
 
-When the current thread's `SessionHandler` is present and available for this instance's pool, it calls `SessionHandler#rollback(String)`, which rolls back the transaction and closes the session; otherwise it does nothing (`OBDal#rollbackAndClose()`, `SessionHandler#rollback(String)`).
+When the current thread's `SessionHandler` is present and available for this instance's pool, it calls `SessionHandler#rollback(String)`; otherwise it does nothing (`OBDal#rollbackAndClose()`, `SessionHandler#rollback(String)`). What that method rolls back and closes, including the paths that skip the rollback or leave the session open, is owned by [01-architecture.md#commit-rollback-and-flush](./01-architecture.md#commit-rollback-and-flush) (`SessionHandler#rollback(String)`).
 
 Example: see [`OBDal#createQuery(Class, String)`](#obdalcreatequeryclass-string) (`DalTest#canDeleteWithOBQuery`).
 
