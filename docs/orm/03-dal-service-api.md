@@ -49,14 +49,24 @@ Design reasons are stated only where the cited method's code, source comment or 
 The diagram shows how the four classes reach each other and Hibernate.
 
 ```mermaid
+---
+config:
+  flowchart:
+    useMaxWidth: false
+---
 flowchart LR
-  dalGetInstance["OBDal#getInstance()"] --> providerGet["OBProvider#get(Class)"]
-  dalCreateQuery["OBDal#createQuery(Class, String, Map)"] --> obQuery["OBQuery"]
-  dalCreateCriteria["OBDal#createCriteria(Class)"] --> obCriteria["OBCriteria"]
+  dalGetInstance["OBDal#getInstance()"] --> providerGet["`OBProvider#get
+  (Class)`"]
+  dalCreateQuery["`OBDal#createQuery
+  (Class, String, Map)`"] --> obQuery["OBQuery"]
+  dalCreateCriteria["`OBDal#createCriteria
+  (Class)`"] --> obCriteria["OBCriteria"]
   obCriteria ==>|extends| criteriaImpl["CriteriaImpl (boundary)"]
-  queryCreateQuery["OBQuery#createQuery()"] --> queryCreateQueryClass["OBQuery#createQuery(Class)"]
+  queryCreateQuery["OBQuery#createQuery()"] --> queryCreateQueryClass["`OBQuery#createQuery
+  (Class)`"]
   queryCreateQueryClass --> hibernateQuery["Query (boundary)"]
-  dalSave["OBDal#save(Object)"] --> handlerSave["SessionHandler#save(String, Object)"]
+  dalSave["OBDal#save(Object)"] --> handlerSave["`SessionHandler#save
+  (String, Object)`"]
 ```
 
 Diagram sources: observed calls (solid arrows): `OBDal#getInstance()` obtains its instance from `OBProvider#get(Class)`; `OBDal#createQuery(Class, String, Map)` constructs the `OBQuery`; `OBDal#createCriteria(Class)` constructs the `OBCriteria`; `OBQuery#createQuery()` calls `OBQuery#createQuery(Class)`, which creates the Hibernate `Query` (boundary) on the session from `SessionHandler#getSession(String)`; `OBDal#save(Object)` ends with `SessionHandler#save(String, Object)`. Declared supertype (thick arrow): the class declaration `public class OBCriteria<E extends BaseOBObject> extends CriteriaImpl`; `OBCriteria#list()` and `OBCriteria#uniqueResult()` call the superclass methods after `OBCriteria#initialize`.
