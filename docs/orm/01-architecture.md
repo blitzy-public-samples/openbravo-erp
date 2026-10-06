@@ -149,6 +149,11 @@ In the method bodies the delegate opens the session before any session informati
 > **Ambiguity:** The `DalSessionFactory` class Javadoc says that, for the calls that open a session, an extra action sets session information in the database and then the call is forwarded to the real session factory (`DalSessionFactory#openSession()`, class Javadoc). The bodies of `DalSessionFactory#openSession()`, `DalSessionFactory#openStatelessSession()` and `DalSessionFactory#openStatelessSession(Connection)` forward the call first and set session information afterwards, on the connection of the session the delegate returned (`DalSessionFactory#openSession()`, `DalSessionFactory#openStatelessSession()`, `DalSessionFactory#openStatelessSession(Connection)`). No source states which order is intended, and this documentation does not resolve it.
 
 ```mermaid
+---
+config:
+  flowchart:
+    useMaxWidth: false
+---
 flowchart LR
   INIT["DalRequestFilter#init"] --> ORCH["startup orchestration (DalLayerInitializer / SessionFactoryController, boundary)"]
   AD["Application Dictionary"] -.->|dependency| RM["runtime model"]
@@ -225,6 +230,11 @@ At development time `GenerateEntitiesTask#execute` writes a Java source file und
 Why the task checks for changes itself: the comment on `src/build.xml#generate.entities.quick` explains that the quick target, unlike the full one, does not clean `src-gen`, and that `GenerateEntitiesTask` always checks whether the Application Dictionary changed before regenerating, by comparing the modification time of the generated sources with the last update time of the Application Dictionary (`src/build.xml#generate.entities.quick`, `GenerateEntitiesTask#hasChanged`).
 
 ```mermaid
+---
+config:
+  flowchart:
+    useMaxWidth: false
+---
 flowchart TD
   subgraph build["Ant targets"]
     RGE["build.xml#generate.entities"] -->|ant| SGE["src/build.xml#generate.entities"]
