@@ -2,11 +2,11 @@
 
 ## Reading guide
 
-This reference is for Java developers extending Openbravo modules. It documents every public member of the four DAL service classes `OBDal`, `OBCriteria`, `OBQuery` and `OBProvider`: what the member's code does, which checks it performs, and a usage example copied from the `org.openbravo.test.dal` tests where one exists.
+This reference is for Java developers extending Openbravo modules. It documents every public member of the four [DAL](./05-glossary.md#data-access-layer-dal) service classes `OBDal`, `OBCriteria`, `OBQuery` and `OBProvider`: what the member's code does, which checks it performs, and a usage example copied from the `org.openbravo.test.dal` tests where one exists.
 
 Reading order: [01-architecture.md](./01-architecture.md) -> [02-runtime-model.md](./02-runtime-model.md) -> 03-dal-service-api.md -> [04-security-and-filtering.md](./04-security-and-filtering.md) -> [05-glossary.md](./05-glossary.md). Previous file: [02-runtime-model.md](./02-runtime-model.md). Next file: [04-security-and-filtering.md](./04-security-and-filtering.md).
 
-`OBDal` reads, saves and removes the [business objects](./05-glossary.md#business-object) of each [entity](./05-glossary.md#entity) in the Hibernate [session](./05-glossary.md#session) and [transaction](./05-glossary.md#transaction) that `SessionHandler` keeps for a database connection [pool](./05-glossary.md#pool), and it creates the two query classes (`OBDal#createQuery(Class, String, Map)`, `OBDal#createCriteria(Class)`). `OBCriteria` is a Hibernate [criteria](./05-glossary.md#criteria) object and `OBQuery` wraps an [HQL](./05-glossary.md#hql) where and order by clause; both add [client](./05-glossary.md#client) and [organization](./05-glossary.md#organization) restrictions before they run (`OBCriteria#initialize`, `OBQuery#createQueryString`). `OBProvider` creates instances according to its [provider registrations](./05-glossary.md#provider-registration) (`OBProvider#get(Class)`).
+`OBDal` reads, saves and removes the [business objects](./05-glossary.md#business-object) of each [entity](./05-glossary.md#entity) in the Hibernate [session](./05-glossary.md#session) and [transaction](./05-glossary.md#transaction) that `SessionHandler` keeps for a database connection [pool](./05-glossary.md#pool), and it creates the two query classes (`OBDal#createQuery(Class, String, Map)`, `OBDal#createCriteria(Class)`). `OBCriteria` is a Hibernate [criteria](./05-glossary.md#criteria) object and `OBQuery` wraps an [HQL](./05-glossary.md#hql) [where clause](./05-glossary.md#where-clause) and [order by clause](./05-glossary.md#order-by-clause); both add [client](./05-glossary.md#client) and [organization](./05-glossary.md#organization) restrictions before they run (`OBCriteria#initialize`, `OBQuery#createQueryString`). `OBProvider` creates instances according to its [provider registrations](./05-glossary.md#provider-registration) (`OBProvider#get(Class)`).
 
 Sources: every class cited in this file resolves to the path below.
 
@@ -197,7 +197,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalLockingTest.java` — `DalLockin
 
 `public boolean isSessionDirty()`
 
-Returns `SessionHandler#isSessionDirty(String)` for this instance's pool, and its Javadoc warns that `isDirty` should not be invoked directly on the Hibernate session (`OBDal#isSessionDirty()`). The reason is given in the Javadoc of `SessionHandler#isSessionDirty(String)`: a direct call triggers the entity persistence observers of modified entities, which the handler's [dirty check](./05-glossary.md#dirty-check) prevents (`SessionHandler#isSessionDirty(String)`).
+Returns `SessionHandler#isSessionDirty(String)` for this instance's pool, and its Javadoc warns that `isDirty` should not be invoked directly on the Hibernate session (`OBDal#isSessionDirty()`). The reason is given in the Javadoc of `SessionHandler#isSessionDirty(String)`: a direct call triggers the [entity persistence observers](./05-glossary.md#entity-persistence-observer) of modified entities, which the handler's [dirty check](./05-glossary.md#dirty-check) prevents (`SessionHandler#isSessionDirty(String)`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -231,7 +231,7 @@ Example: see [`OBDal#createQuery(Class, String)`](#obdalcreatequeryclass-string)
 
 `public void save(Object obj)`
 
-If `obj` is a `BaseOBObject` of a [view entity](./05-glossary.md#view-entity), it logs a warning and returns without saving (`OBDal#save(Object)`). Otherwise it first fills a missing client or organization of a client-enabled or organization-enabled object with [proxies](./05-glossary.md#proxy) of the current client and organization of `OBContext` (`OBDal#setClientOrganization`).
+If `obj` is a `BaseOBObject` of a [view entity](./05-glossary.md#view-entity), it logs a warning and returns without saving (`OBDal#save(Object)`). Otherwise it first fills a missing client or organization of a [client-enabled](./05-glossary.md#client-enabled-entity) or [organization-enabled](./05-glossary.md#organization-enabled-entity) object with [proxies](./05-glossary.md#proxy) of the current client and organization of `OBContext` (`OBDal#setClientOrganization`).
 
 In [admin mode](./05-glossary.md#admin-mode) (`OBContext#isInAdministratorMode`) it calls `BaseOBObject#setAccessChecks` on a `BaseOBObject` with the write access check disabled and the [org/client access check](./05-glossary.md#orgclient-access-check) set to `OBContext#doOrgClientAccessCheck`, and does nothing further for any other object before saving (`OBDal#save(Object)`). Outside admin mode it calls `EntityAccessChecker#checkWritable(Entity)` for a `BaseOBObject` and then `SecurityChecker#checkWriteAccess(Object)`, and both throw `OBSecurityException` when the check fails (`OBDal#save(Object)`, `EntityAccessChecker#checkWritable`, `SecurityChecker#checkWriteAccess(Object)`). The conditions are listed in [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) and [04-security-and-filtering.md#admin-mode](./04-security-and-filtering.md#admin-mode) (`SecurityChecker#checkWriteAccess(Object)`).
 
@@ -460,7 +460,7 @@ Example: see [`OBDal#remove(Object)`](#obdalremoveobject) (`DalTest#testDRemoveB
 
 `public <T extends BaseOBObject> OBCriteria<T> createCriteria(Class<T> clz, String alias)`
 
-Same as `OBDal#createCriteria(Class)`, but passes `alias` to `OBCriteria#OBCriteria(String, String, SessionImplementor)` so that the criteria can refer to the queried object by that alias (`OBDal#createCriteria(Class, String)`). `clz` needs the `ENTITY_NAME` field described in [OBDal reading by id](#obdal-reading-by-id) (`OBDal#checkReadAccess(Class)`).
+Same as `OBDal#createCriteria(Class)`, but passes `alias` to `OBCriteria#OBCriteria(String, String, SessionImplementor)` so that the criteria can refer to the queried object by that [alias](./05-glossary.md#alias) (`OBDal#createCriteria(Class, String)`). `clz` needs the `ENTITY_NAME` field described in [OBDal reading by id](#obdal-reading-by-id) (`OBDal#checkReadAccess(Class)`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -468,7 +468,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public <T extends BaseOBObject> OBCriteria<T> createCriteria(String entityName)`
 
-Runs `OBDal#checkReadAccess(String)` for `entityName`, resolves the entity with `ModelProvider#getEntity(String)`, and returns an `OBCriteria` built by `OBCriteria#OBCriteria(String, SessionImplementor)` from the name of the class returned by `Entity#getMappingClass()` and the session of this instance's pool, with that entity set (`OBDal#createCriteria(String)`). The entity therefore needs a loadable mapping class: `Entity#getMappingClass()` returns null when the class named by `Entity#getClassName()` is not found, and this factory then dereferences that null and throws `NullPointerException` instead of returning a criteria (`OBDal#createCriteria(String)`, `Entity#getMappingClass()`). The mapping class of an `Entity` is described in [02-runtime-model.md#mapping-class-and-generated-interfaces](./02-runtime-model.md#mapping-class-and-generated-interfaces) (`Entity#getMappingClass()`).
+Runs `OBDal#checkReadAccess(String)` for `entityName`, resolves the entity with `ModelProvider#getEntity(String)`, and returns an `OBCriteria` built by `OBCriteria#OBCriteria(String, SessionImplementor)` from the name of the class returned by `Entity#getMappingClass()` and the session of this instance's pool, with that entity set (`OBDal#createCriteria(String)`). The entity therefore needs a loadable [mapping class](./05-glossary.md#mapping-class): `Entity#getMappingClass()` returns null when the class named by `Entity#getClassName()` is not found, and this factory then dereferences that null and throws `NullPointerException` instead of returning a criteria (`OBDal#createCriteria(String)`, `Entity#getMappingClass()`). The mapping class of an `Entity` is described in [02-runtime-model.md#mapping-class-and-generated-interfaces](./02-runtime-model.md#mapping-class-and-generated-interfaces) (`Entity#getMappingClass()`).
 
 ```java
 final int count = OBDal.getInstance().createCriteria(CashBook.ENTITY_NAME).count();
@@ -509,7 +509,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `@Deprecated public String getReadableOrganizationsInClause()`
 
-Returns an HQL in-clause such as `in ('1000000', '1000001')`, built from the [readable organizations](./05-glossary.md#readable-organizations) of `OBContext#getReadableOrganizations`, or `in ('')` when that array is empty (`OBDal#getReadableOrganizationsInClause()`). The Javadoc deprecates it with the advice to use a bind statement parameter instead, and names no replacement method (`OBDal#getReadableOrganizationsInClause()`).
+Returns an HQL [IN clause](./05-glossary.md#in-clause) such as `in ('1000000', '1000001')`, built from the [readable organizations](./05-glossary.md#readable-organizations) of `OBContext#getReadableOrganizations`, or `in ('')` when that array is empty (`OBDal#getReadableOrganizationsInClause()`). The Javadoc deprecates it with the advice to use a bind statement parameter instead, and names no replacement method (`OBDal#getReadableOrganizationsInClause()`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -517,7 +517,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `@Deprecated public String getReadableClientsInClause()`
 
-Returns the same kind of in-clause built from the [readable clients](./05-glossary.md#readable-clients) of `OBContext#getReadableClients`, or `in ('')` when that array is empty (`OBDal#getReadableClientsInClause()`). The Javadoc deprecates it with the advice to use a bind statement parameter instead, and names no replacement method (`OBDal#getReadableClientsInClause()`).
+Returns the same kind of IN clause built from the [readable clients](./05-glossary.md#readable-clients) of `OBContext#getReadableClients`, or `in ('')` when that array is empty (`OBDal#getReadableClientsInClause()`). The Javadoc deprecates it with the advice to use a bind statement parameter instead, and names no replacement method (`OBDal#getReadableClientsInClause()`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -525,7 +525,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public <T extends BaseOBObject> T getObjectLockForNoKeyUpdate(T object)`
 
-Requires an entity with exactly one id property, asserted with `Check.isTrue` (`OBDal#getObjectLockForNoKeyUpdate(T)`). It evicts `object` from the session, runs a native `SELECT ... FOR <lock type>` query on the object's id, where the lock type is `UPDATE` when `DalConnectionProvider` (boundary) reports `ORACLE` and `NO KEY UPDATE` otherwise, and returns a new instance read through `OBDal#getInstance()` and `OBDal#get(Class, Object)` (`OBDal#getObjectLockForNoKeyUpdate(T)`). Its Javadoc gives the design: on PostgreSQL the `FOR NO KEY UPDATE` lock lets other transactions insert child records while the parent is locked, the method is a workaround until Hibernate issue HHH-13135 is fixed, and the lock exists only in the database, where Hibernate cannot detect it (`OBDal#getObjectLockForNoKeyUpdate(T)`). The same Javadoc warns that state not persisted before the call is ignored and that the returned instance must be used instead of the parameter (`OBDal#getObjectLockForNoKeyUpdate(T)`). Illustrated by `DalLockingTest#dalLockIsNotAHibernateLock` (`OBDal#getObjectLockForNoKeyUpdate(T)`).
+Requires an entity with exactly one id property, asserted with `Check.isTrue` (`OBDal#getObjectLockForNoKeyUpdate(T)`). It evicts `object` from the session, runs a [native query](./05-glossary.md#native-query) `SELECT ... FOR <lock type>` on the object's id, where the [lock](./05-glossary.md#lock) type is `UPDATE` when `DalConnectionProvider` (boundary) reports `ORACLE` and `NO KEY UPDATE` otherwise, and returns a new instance read through `OBDal#getInstance()` and `OBDal#get(Class, Object)` (`OBDal#getObjectLockForNoKeyUpdate(T)`). Its Javadoc gives the design: on PostgreSQL the `FOR NO KEY UPDATE` lock lets other transactions insert child records while the parent is locked, the method is a workaround until Hibernate issue HHH-13135 is fixed, and the lock exists only in the database, where Hibernate cannot detect it (`OBDal#getObjectLockForNoKeyUpdate(T)`). The same Javadoc warns that state not persisted before the call is ignored and that the returned instance must be used instead of the parameter (`OBDal#getObjectLockForNoKeyUpdate(T)`). Illustrated by `DalLockingTest#dalLockIsNotAHibernateLock` (`OBDal#getObjectLockForNoKeyUpdate(T)`).
 
 ```java
 AlertRule originalInstance = getTestingAlertRule();
@@ -537,7 +537,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalLockingTest.java` — `DalLockin
 
 ## OBCriteria
 
-`OBCriteria` extends Hibernate's `CriteriaImpl` (boundary), and its class Javadoc states the design: it adds transparent client and organization filtering to the Hibernate criteria, and it offers an order-by convenience method whose referenced entities are joined automatically (`OBCriteria#initialize`, `OBCriteria#addOrderBy(String, boolean)`). The executing methods first call the package-private `OBCriteria#initialize`, which applies, each under its own condition, the read check `EntityAccessChecker#checkReadable(Entity)` and the client, organization and active restrictions, adds the recorded order-by entries, and sets a query timeout through `QueryTimeOutUtil` (boundary) when `SessionInfo` (boundary) holds a query profile (`OBCriteria#initialize`). [04-security-and-filtering.md#criteria-restrictions](./04-security-and-filtering.md#criteria-restrictions) describes when the read check and each restriction apply, and [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) describes the read check's failure (`OBCriteria#initialize`).
+`OBCriteria` extends Hibernate's `CriteriaImpl` (boundary), and its class Javadoc states the design: it adds transparent client and organization filtering to the Hibernate criteria, and it offers an order-by convenience method whose referenced entities are [joined](./05-glossary.md#join) automatically (`OBCriteria#initialize`, `OBCriteria#addOrderBy(String, boolean)`). The executing methods first call the package-private `OBCriteria#initialize`, which applies, each under its own condition, the read check `EntityAccessChecker#checkReadable(Entity)` and the client, organization and active restrictions, adds the recorded order-by entries, and sets a [query timeout](./05-glossary.md#query-timeout) through `QueryTimeOutUtil` (boundary) when `SessionInfo` (boundary) holds a [query profile](./05-glossary.md#query-profile) (`OBCriteria#initialize`). [04-security-and-filtering.md#criteria-restrictions](./04-security-and-filtering.md#criteria-restrictions) describes when the read check and each restriction apply, and [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) describes the read check's failure (`OBCriteria#initialize`).
 
 ### OBCriteria constructors
 
@@ -597,7 +597,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalTest.java` — `DalTest#testDRem
 
 `public int count()`
 
-A convenience method that the standard Hibernate criteria lacks, per its Javadoc: it calls `OBCriteria#initialize`, sets a row-count projection, reads the count through `OBCriteria#uniqueResult()`, resets the projection to null and returns the count as an `int` (`OBCriteria#count()`).
+A convenience method that the standard Hibernate criteria lacks, per its Javadoc: it calls `OBCriteria#initialize`, sets a row-count [projection](./05-glossary.md#projection), reads the count through `OBCriteria#uniqueResult()`, resets the projection to null and returns the count as an `int` (`OBCriteria#count()`).
 
 ```java
 setSystemAdministratorContext();
@@ -651,7 +651,7 @@ Source: `src-test/src/org/openbravo/test/dal/ComputedColumnsTest.java` — `Comp
 
 Records an order-by entry, marks the criteria as modified and returns it for chaining (`OBCriteria#addOrderBy(String, boolean)`). `OBCriteria#initialize` turns each entry into an ascending or descending order; for a dotted path it creates an alias for the part before the last dot and orders on that alias, so the referenced entity is joined (`OBCriteria#initialize`).
 
-> **Ambiguity:** `OBCriteria#initialize` builds the join alias as `"order_ob_" + j` with `final int j = 0` declared inside the loop over the order-by entries, so every dotted path receives the same alias `order_ob_0` (`OBCriteria#initialize`). No `org.openbravo.test.dal` test orders by two dotted paths, so whether a shared alias is intended is not shown (`OBCriteria#addOrderBy(String, boolean)`). These docs do not resolve it.
+> **Ambiguity:** `OBCriteria#initialize` builds the [join](./05-glossary.md#join) alias as `"order_ob_" + j` with `final int j = 0` declared inside the loop over the order-by entries, so every dotted path receives the same alias `order_ob_0` (`OBCriteria#initialize`). No `org.openbravo.test.dal` test orders by two dotted paths, so whether a shared alias is intended is not shown (`OBCriteria#addOrderBy(String, boolean)`). These docs do not resolve it.
 
 ```java
 final OBCriteria<Product> obc = OBDal.getInstance().createCriteria(Product.class);
@@ -880,7 +880,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalPerformanceExampleTest.java` —
 
 `public int count()`
 
-Builds a `select count(*)` query from the part of the `OBQuery#createQueryString` result that follows its first `from` keyword, without the order by clause, binds the named parameters and returns the count as an `int` (`OBQuery#count()`). It does not apply the first result, max result, [fetch size](./05-glossary.md#fetch-size) or query type settings (`OBQuery#count()`).
+Builds a `select count(*)` query from the part of the `OBQuery#createQueryString` result that follows its first `from` keyword, without the order by clause, binds the named parameters and returns the count as an `int` (`OBQuery#count()`). It does not apply the first result, max result, [fetch size](./05-glossary.md#fetch-size) or [query type](./05-glossary.md#query-type) settings (`OBQuery#count()`).
 
 ```java
 final OBQuery<MaterialTransaction> cq = OBDal.getInstance()
@@ -904,7 +904,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalQueryTest.java` — `DalQueryTes
 
 When the lower-cased `OBQuery#createQueryString` result holds a `from` with a space on each side, it drops everything up to the end of the first such `from` written in lower case, or the first five characters when every such `from` is written in upper or mixed case (`OBQuery#getRowNumber(String)`). It then builds a query that selects `id`, prefixed with the alias and a dot when the clause starts with an `as` alias, followed by `from` and the rest of the result, or the whole result when nothing was dropped, which keeps the filters and order by clause when the dropped part ends at the `from` that `OBQuery#createQueryString` writes before the entity name (`OBQuery#getRowNumber(String)`, `OBQuery#createQueryString`). It applies the query timeout of `OBQuery#addQueryProfile`, binds the named parameters, scrolls forward through the rows and returns the row number of the first id equal to `targetId`, or `-1` when none matches (`OBQuery#getRowNumber(String)`).
 
-> **Ambiguity:** The Javadoc of `OBQuery#getRowNumber(String)` says it returns the row number of the record with the given id, or `-1` when it is not found, taking the query's filter and sorting settings into account (`OBQuery#getRowNumber(String)`). Without an alias and without a select clause, the `OBQuery#createQueryString` result starts with `from` with no space before it, so the body drops nothing when the where and order by part holds no spaced `from`, and the query string it builds then has `from` twice in a row before the entity name; when that part holds a lower-case spaced `from`, the dropped part ends inside it instead (`OBQuery#getRowNumber(String)`, `OBQuery#createQueryString`). `OBQuery#count()` puts a space before the query string ahead of the same search, while `OBQuery#getRowNumber(String)` does not (`OBQuery#count()`, `OBQuery#getRowNumber(String)`). These docs do not resolve whether the Javadoc contract holds for such queries.
+> **Ambiguity:** The Javadoc of `OBQuery#getRowNumber(String)` says it returns the row number of the record with the given id, or `-1` when it is not found, taking the query's filter and sorting settings into account (`OBQuery#getRowNumber(String)`). Without an alias and without a [select clause](./05-glossary.md#select-clause), the `OBQuery#createQueryString` result starts with `from` with no space before it, so the body drops nothing when the where and order by part holds no spaced `from`, and the query string it builds then has `from` twice in a row before the entity name; when that part holds a lower-case spaced `from`, the dropped part ends inside it instead (`OBQuery#getRowNumber(String)`, `OBQuery#createQueryString`). `OBQuery#count()` puts a space before the query string ahead of the same search, while `OBQuery#getRowNumber(String)` does not (`OBQuery#count()`, `OBQuery#getRowNumber(String)`). These docs do not resolve whether the Javadoc contract holds for such queries.
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -939,7 +939,7 @@ Example: see [`OBQuery#count()`](#obquerycount) (`DalQueryTest#testJTransaction2
 
 `public <T extends Object> Query<T> createQuery(Class<T> clz)`
 
-Creates a Hibernate `Query` typed to `clz` from the `OBQuery#createQueryString` result on the session of the query's pool, binds the named parameters, and applies the fetch size, first result and max result when each is above `-1` (`OBQuery#createQuery(Class)`). It then sets a query timeout through `QueryTimeOutUtil` (boundary) from `OBQuery#getQueryType()` or, when that is null, from the `SessionInfo` (boundary) query profile (`OBQuery#addQueryProfile`, `OBQuery#createQuery(Class)`). It wraps any exception thrown by these steps, from creating the query on the session to setting the query timeout, in `OBException` (`OBQuery#createQuery(Class)`). It builds the query string before these steps and outside that wrapping, so a failure of `OBQuery#createQueryString`, such as the `OBSecurityException` that `EntityAccessChecker#checkReadable(Entity)` throws outside admin mode for an entity that is not readable, reaches the caller unwrapped; [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) describes that read check (`OBQuery#createQuery(Class)`, `OBQuery#createQueryString`, `EntityAccessChecker#checkReadable(Entity)`). Its Javadoc notes that a select clause set with `OBQuery#setSelectClause(String)` takes precedence over `clz` for the type of the returned objects (`OBQuery#createQuery(Class)`).
+Creates a Hibernate `Query` typed to `clz` from the `OBQuery#createQueryString` result on the session of the query's pool, binds the named parameters, and applies the fetch size, first result and max result when each is above `-1` (`OBQuery#createQuery(Class)`). It then sets a query timeout through `QueryTimeOutUtil` (boundary) from `OBQuery#getQueryType()` or, when that is null, from the `SessionInfo` (boundary) query profile (`OBQuery#addQueryProfile`, `OBQuery#createQuery(Class)`). It wraps any exception thrown by these steps, from creating the query on the session to setting the query timeout, in `OBException` (`OBQuery#createQuery(Class)`). It builds the query string before these steps and outside that wrapping, so a failure of `OBQuery#createQueryString`, such as the `OBSecurityException` that `EntityAccessChecker#checkReadable(Entity)` throws outside admin mode for an entity that is not readable, reaches the caller unwrapped; [04-security-and-filtering.md#access-checks](./04-security-and-filtering.md#access-checks) describes that read check (`OBQuery#createQuery(Class)`, `OBQuery#createQueryString`, `EntityAccessChecker#checkReadable(Entity)`). Its Javadoc notes that a [select clause](./05-glossary.md#select-clause) set with `OBQuery#setSelectClause(String)` takes precedence over `clz` for the type of the returned objects (`OBQuery#createQuery(Class)`).
 
 No src-test usage found in org.openbravo.test.dal.
 
@@ -1165,7 +1165,7 @@ No src-test usage found in org.openbravo.test.dal.
 
 ## OBProvider
 
-`OBProvider` keeps registrations keyed by class or service name and creates the instances that callers request, for example the instances returned by `OBDal#getInstance()` (`OBProvider#get(Class)`). Its class Javadoc describes it as an implementation of the service locator pattern, in which each registered class is identified as one to be treated as a [singleton](./05-glossary.md#singleton) or not (`OBProvider#register(String, Class, boolean)`).
+`OBProvider` keeps registrations keyed by class or service name and creates the instances that callers request, for example the instances returned by `OBDal#getInstance()` (`OBProvider#get(Class)`). Its class Javadoc describes it as an implementation of the [service locator](./05-glossary.md#service-locator) pattern, in which each registered class is identified as one to be treated as a [singleton](./05-glossary.md#singleton) or not (`OBProvider#register(String, Class, boolean)`).
 
 ### OBProvider instance
 
@@ -1280,6 +1280,6 @@ No src-test usage found in org.openbravo.test.dal.
 
 `public static final String CONFIG_FILE_NAME = "provider-config.xml";`
 
-Holds the provider configuration file name `provider-config.xml`, and no method declared in `OBProvider` reads it (`OBProvider#CONFIG_FILE_NAME`). The protected `OBProvider#register(String, InputStream)` and `OBProvider#register(String, String)`, which their source comments mark as used by `OBConfigFileProvider` (boundary), hand provider configuration to `OBProviderConfigReader` (boundary) (`OBProvider#register(String, String)`).
+Holds the [provider configuration](./05-glossary.md#provider-configuration) file name `provider-config.xml`, and no method declared in `OBProvider` reads it (`OBProvider#CONFIG_FILE_NAME`). The protected `OBProvider#register(String, InputStream)` and `OBProvider#register(String, String)`, which their source comments mark as used by `OBConfigFileProvider` (boundary), hand provider configuration to `OBProviderConfigReader` (boundary) (`OBProvider#register(String, String)`).
 
 No src-test usage found in org.openbravo.test.dal.
