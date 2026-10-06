@@ -36,7 +36,7 @@ Every behavioural statement ends with a `Class#method` citation; class names res
 
 ## How the runtime model is built
 
-`ModelProvider#getModel` builds the model the first time it is called, by calling the private `ModelProvider#initialize`, and returns the cached list of entities on later calls (`ModelProvider#getModel`). `ModelProvider#refresh` forces a rebuild: it removes the registered instance with `OBProvider#removeInstance(Class)`, obtains a new one with `OBProvider#get(Class)`, installs it with `ModelProvider#setInstance` and calls `getModel` on it, wrapping any exception in `OBException` (`ModelProvider#refresh`). The startup context is described in [the startup section of 01-architecture.md](./01-architecture.md#startup-sequence).
+`ModelProvider#getModel` builds the model the first time it is called, by calling the private `ModelProvider#initialize`, and returns the cached list of entities on later calls (`ModelProvider#getModel`). `ModelProvider#refresh` forces a rebuild: it removes the registered instance with `OBProvider#removeInstance(Class)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obproviderremoveinstanceclass)), obtains a new one with `OBProvider#get(Class)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obprovidergetclass)), installs it with `ModelProvider#setInstance` and calls `getModel` on it, wrapping any exception in `OBException` (`ModelProvider#refresh`). The startup context is described in [the startup section of 01-architecture.md](./01-architecture.md#startup-sequence).
 
 `ModelProvider#initialize` performs these steps in this order (`ModelProvider#initialize`):
 
@@ -57,7 +57,7 @@ Every behavioural statement ends with a `Class#method` citation; class names res
 - `ModelProvider#setVirtualPropertiesForReferenceId` handles entities whose id is not a single [primitive property](./05-glossary.md#primitive-property) (`ModelProvider#setVirtualPropertiesForReferenceId`):
   - An entity with one non-primitive id property gets an extra [one-to-one](./05-glossary.md#one-to-one) [reference property](./05-glossary.md#reference-property) to the target entity, and the original id property is turned into a primitive property whose `Property#getIdBasedOnProperty` is the new property (`ModelProvider#createIdReferenceProperty`).
   - An entity with several id properties gets a [composite id](./05-glossary.md#composite-id) ([Naming rules](#naming-rules) describes it) (`ModelProvider#createCompositeId`).
-  - The source comment gives the reason for the extra property: when the id property is also a reference (a [foreign key](./05-glossary.md#foreign-key)), Hibernate requires two mappings, one for the id and one for the reference, and the id generation strategy should be set to `foreign` (`ModelProvider#initialize`).
+  - The source comment gives the reason for the extra property: when the id property is also a reference (a [foreign key](./05-glossary.md#foreign-key)), Hibernate requires two mappings, one for the id and one for the reference, and the comment names `foreign` as the id generation strategy for this case (`ModelProvider#initialize`).
 - It reads every [unique constraint](./05-glossary.md#unique-constraint) and the column not-null metadata from the database through [native queries](./05-glossary.md#native-query); a unique constraint whose table has no [table-based entity](./05-glossary.md#table-based-entity) is skipped (`ModelProvider#buildUniqueConstraints`, `ModelProvider#getColumnMandatories`).
 - It names every property that is not one-to-many with `Property#initializeName` and sets its [mandatory flag](./05-glossary.md#mandatory-flag) from the database not-null value (`ModelProvider#initialize`).
   - The mandatory flag is not taken from the database for [view entities](./05-glossary.md#view-entity), for properties without a column name, or for datasource-based, HQL-based and virtual entities; a missing database value is logged unless the property is a computed column or a [proxy](./05-glossary.md#proxy) (`ModelProvider#initialize`).
@@ -143,7 +143,7 @@ Diagram sources: every node is a control-flow step and every edge is execution o
 
 ## Looking up the model
 
-Each lookup reads indexes that `ModelProvider#initialize` fills; the table states what each one does when the key is unknown (`ModelProvider#initialize`).
+Module code chooses the lookup by the key it holds: `ModelProvider#getEntity(String)` takes an [entity name](./05-glossary.md#entity-name), `ModelProvider#getEntity(Class)` a Java class such as a generated class, `ModelProvider#getEntityByTableName` a table name and `ModelProvider#getEntityByTableId` a table id, and `ModelProvider#getEntity(String, boolean)` lets the caller choose whether an unknown entity name throws `CheckException` or returns null (`ModelProvider#getEntity(String)`, `ModelProvider#getEntity(Class)`, `ModelProvider#getEntityByTableName`, `ModelProvider#getEntityByTableId`, `ModelProvider#getEntity(String, boolean)`). Each lookup reads indexes that `ModelProvider#initialize` fills; the table states what each one does when the key is unknown (`ModelProvider#initialize`).
 
 | Method | Key | Result for an unknown key | Citation |
 |--------|-----|---------------------------|----------|
@@ -164,7 +164,7 @@ Each lookup reads indexes that `ModelProvider#initialize` fills; the table state
 
 ## Entity
 
-`Entity` models one table of the runtime model; its Javadoc calls it the main concept of the in-memory model and says its properties are primitive typed, references or lists of child entities (`Entity#getProperties`).
+Module code reads the metadata of an entity from the `Entity` object that the entity lookups in [Looking up the model](#looking-up-the-model), `BaseOBObject#getEntity`, `OBCriteria#getEntity()` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obcriteriagetentity)) and `OBQuery#getEntity()` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obquerygetentity)) return: its properties through `Entity#getProperties`, `Entity#getProperty(String)` and `Entity#getPropertyByColumnName(String)`, and its kind and flags through getters such as `Entity#isView`, `Entity#isClientEnabled` and `Entity#isTraceable` (`BaseOBObject#getEntity`, `OBCriteria#getEntity()`, `OBQuery#getEntity()`, `Entity#getProperties`, `Entity#getProperty(String)`, `Entity#getPropertyByColumnName(String)`, `Entity#isView`, `Entity#isClientEnabled`, `Entity#isTraceable`). `Entity` models one table of the runtime model; its Javadoc calls it the main concept of the in-memory model and says its properties are primitive typed, references or lists of child entities (`Entity#getProperties`).
 
 ### Identity and properties
 
@@ -229,7 +229,7 @@ Each lookup reads indexes that `ModelProvider#initialize` fills; the table state
 
 ## Property
 
-`Property` models one attribute of an entity; its Javadoc says a property "can be a primitive type, a reference or a list (one-to-many) property" (`Property#isPrimitive`, `Property#isOneToMany`).
+Module code names a property when it calls the dynamic API: `BaseOBObject#get(String)` and `BaseOBObject#set(String, Object)` resolve the name to a `Property` through `Entity#getProperty(String)`, and `BaseOBObject#set(String, Object)` runs `Property#checkIsValidValue` on the value and `Property#checkIsWritable` on the property before it stores the value (`BaseOBObject#get(String)`, `BaseOBObject#get(String, Language, String)`, `BaseOBObject#set(String, Object)`). `Property` models one attribute of an entity; its Javadoc says a property "can be a primitive type, a reference or a list (one-to-many) property" (`Property#isPrimitive`, `Property#isOneToMany`).
 
 ### Property kinds
 
@@ -286,7 +286,7 @@ The flag is set in two stages: `Property#initializeFromColumn(Column, boolean)` 
 
 ## BaseOBObject and its interfaces
 
-`BaseOBObject` is the abstract class that its Javadoc calls the root of the inheritance tree for all [business objects](./05-glossary.md#business-object); the same Javadoc says callers should use its interfaces to determine whether an object supports specific functionality (`BaseOBObject#getEntityName`, class Javadoc). A concrete subclass has to provide an implementation of the abstract `BaseOBObject#getEntityName`, either its own or an inherited one (`BaseOBObject#getEntityName`).
+`BaseOBObject` is the abstract class that its Javadoc calls the root of the inheritance tree for all [business objects](./05-glossary.md#business-object); the same Javadoc says the interfaces tag an implementation with the functionality it provides and directs code outside the class to them to determine whether an object supports specific functionality (`BaseOBObject#getEntityName`, class Javadoc). A concrete subclass has to provide an implementation of the abstract `BaseOBObject#getEntityName`, either its own or an inherited one (`BaseOBObject#getEntityName`).
 
 ### Implemented interfaces
 
@@ -302,7 +302,7 @@ The flag is set in two stages: `Property#initializeFromColumn(Column, boolean)` 
 
 Whether a class tagged with `OBNotSingleton` is a [singleton](./05-glossary.md#singleton) is ambiguous in the code; [the OBDal#getInstance() entry in 03-dal-service-api.md](./03-dal-service-api.md#obdalgetinstance) documents the method itself (`OBDal#getInstance()`).
 
-> **Ambiguity:** The Javadoc of `OBNotSingleton` reads "Tags a class as being a singleton", while `OBProvider#register(String, Class, boolean)` decides whether a registration is a singleton only from whether the class implements `OBSingleton`; `OBDal` implements `OBNotSingleton`, yet `OBDal#getInstance()` caches a static instance, keeping the instance it obtains from `OBProvider#get(Class)` in a static field whenever that field is null (`OBProvider#register(String, Class, boolean)`, `OBDal#getInstance()`). This documentation does not resolve the difference.
+> **Ambiguity:** The Javadoc of `OBNotSingleton` reads "Tags a class as being a singleton", while `OBProvider#register(String, Class, boolean)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obproviderregisterstring-class-boolean)) decides whether a registration is a singleton only from whether the class implements `OBSingleton`; `OBDal` implements `OBNotSingleton`, yet `OBDal#getInstance()` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obdalgetinstance)) caches a static instance, keeping the instance it obtains from `OBProvider#get(Class)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obprovidergetclass)) in a static field whenever that field is null (`OBProvider#register(String, Class, boolean)`, `OBDal#getInstance()`). This documentation does not resolve the difference.
 
 ### Values, identity and the new-object flag
 
@@ -310,7 +310,7 @@ Whether a class tagged with `OBNotSingleton` is a [singleton](./05-glossary.md#s
 - `BaseOBObject#getEntity` looks the entity up once through `ModelProvider#getEntity(String)` with the object's `BaseOBObject#getEntityName`, and caches it (`BaseOBObject#getEntity`).
 - `BaseOBObject#getId` and `BaseOBObject#setId` read and write the `id` property through `get` and `set`, so the checks of the dynamic API apply to them (`BaseOBObject#getId`, `BaseOBObject#setId`).
 - `BaseOBObject#getIdentifier` returns the identifier that `IdentifierProvider` computes for the object (`BaseOBObject#getIdentifier`). `BaseOBObject#toString` returns the entity name, the id in parentheses, and the non-null values of the identifier properties, which it reads with `get`, writing the id for a referenced object (`BaseOBObject#toString`).
-- A [new object](./05-glossary.md#new-object): `BaseOBObject#isNewOBObject` is true when the id is null or the flag set by `BaseOBObject#setNewOBObject` is true (`BaseOBObject#isNewOBObject`). The field comment gives the reason for the flag: it forces an insert of the object, which is useful when the id of an imported object should be preserved (`BaseOBObject#setNewOBObject`). `OBInterceptor#postFlush` sets the flag back to false for every flushed object, as [the interceptor section of 04-security-and-filtering.md](./04-security-and-filtering.md#interceptor-behavior) describes (`OBInterceptor#postFlush`).
+- A [new object](./05-glossary.md#new-object): `BaseOBObject#isNewOBObject` is true when the id is null or the flag set by `BaseOBObject#setNewOBObject` is true (`BaseOBObject#isNewOBObject`). The field comment gives the reason for the flag: it forces an insert of the object, which the comment calls useful for keeping the id of an imported object (`BaseOBObject#setNewOBObject`). `OBInterceptor#postFlush` sets the flag back to false for every flushed object, as [the interceptor section of 04-security-and-filtering.md](./04-security-and-filtering.md#interceptor-behavior) describes (`OBInterceptor#postFlush`).
 - `BaseOBObject#setAllowRead(boolean)` lets an object skip the derived-read check, and throws `OBSecurityException` when it is called outside [admin mode](./05-glossary.md#admin-mode) (`BaseOBObject#setAllowRead`).
 - `BaseOBObject#setAccessChecks(boolean, boolean)` stores a write-access flag and an org/client flag, which `BaseOBObject#isWriteAccessCheckEnabled()` and `BaseOBObject#isOrgClientAccessCheckEnabled()` return; all three methods are marked "For internal use only" (`BaseOBObject#setAccessChecks(boolean, boolean)`, `BaseOBObject#isWriteAccessCheckEnabled()`, `BaseOBObject#isOrgClientAccessCheckEnabled()`). `SecurityChecker#checkWriteAccess(Object)`, through the private `SecurityChecker#checkWriteAccess(Object, boolean)` to which it delegates, reads the flags only inside the tests it runs for an object that has a client when the context is outside admin mode or `OBContext#doOrgClientAccessCheck()` is true: a false write-access flag skips the entity write test against `EntityAccessChecker#isWritable(Entity)`, a false org/client flag skips the writable-organization test of the [org/client access check](./05-glossary.md#orgclient-access-check), and neither flag affects the comparison of the object's client with `OBContext#getCurrentClient()`, as [the write access check section of 04-security-and-filtering.md](./04-security-and-filtering.md#write-access-check) describes (`SecurityChecker#checkWriteAccess(Object)`, `SecurityChecker#checkWriteAccess(Object, boolean)`).
 
@@ -346,7 +346,7 @@ classDiagram
   note "Classes passed to OBDal createCriteria(Class) must satisfy its bound T extends BaseOBObject. The concrete generated structure is unavailable because SystemInformation is Not Found."
 ```
 
-Diagram sources: the five realization edges are declared supertypes from the `implements` clause of `BaseOBObject`, whose `BaseOBObject#get(String)`, `BaseOBObject#set(String, Object)`, `BaseOBObject#getEntity`, `BaseOBObject#getId`, `BaseOBObject#setId`, `BaseOBObject#getIdentifier` and `BaseOBObject#getEntityName` provide the interface members; the association to `Entity` is `BaseOBObject#getEntity`, one entity per object; the association to `Property` is `Entity#getProperties`, drawn as `*` because `ModelProvider#removeInvalidTables` requires a primary-key column only for table-based tables; the note cites the bound on `OBDal#createCriteria(Class)` and the Not Found record in [Worked example: SystemInformation](#worked-example-systeminformation); no edge is drawn for generated classes or `DynamicOBObject`.
+Diagram sources: the five realization edges are declared supertypes from the `implements` clause of `BaseOBObject`, whose `BaseOBObject#get(String)`, `BaseOBObject#set(String, Object)`, `BaseOBObject#getEntity`, `BaseOBObject#getId`, `BaseOBObject#setId`, `BaseOBObject#getIdentifier` and `BaseOBObject#getEntityName` provide the interface members (`BaseOBObject#get(String)`, `BaseOBObject#set(String, Object)`, `BaseOBObject#getEntity`, `BaseOBObject#getId`, `BaseOBObject#setId`, `BaseOBObject#getIdentifier`, `BaseOBObject#getEntityName`). The association to `Entity` is `BaseOBObject#getEntity`, one entity per object (`BaseOBObject#getEntity`). The association to `Property` is `Entity#getProperties`, drawn as `*` because `ModelProvider#removeInvalidTables` requires a primary-key column only for table-based tables (`Entity#getProperties`, `ModelProvider#removeInvalidTables`). The note cites the bound on `OBDal#createCriteria(Class)` ([its entry in 03-dal-service-api.md](./03-dal-service-api.md#obdalcreatecriteriaclass)) and the Not Found record in [Worked example: SystemInformation](#worked-example-systeminformation) (`OBDal#createCriteria(Class)`, `GenerateEntitiesTask#execute`). No edge is drawn for generated classes or `DynamicOBObject` (`GenerateEntitiesTask#execute`, `Entity#getMappingClass`).
 
 ## Dynamic API and generated typed API
 
@@ -362,7 +362,7 @@ Code can read and write the values of a business object by property name through
 
 ### Unchecked access
 
-- `BaseOBObject#getValue(String)` and `BaseOBObject#setValue(String, Object)` skip the security and validation checks; the Javadoc of `setValue` says it "should be used with care" and is used by subclasses and system classes (`BaseOBObject#getValue`, `BaseOBObject#setValue`).
+- `BaseOBObject#getValue(String)` and `BaseOBObject#setValue(String, Object)` skip the security and validation checks; the Javadoc of `setValue` cautions callers to use it with care and says it is used by subclasses and system classes (`BaseOBObject#getValue`, `BaseOBObject#setValue`).
 - Both still resolve the property by name, so an unknown name throws `CheckException`, and `setValue` throws `IllegalArgumentException` when the property's index is not smaller than the size of the value array (`BaseOBObject#setValue`).
 
 ### Typed API
@@ -415,7 +415,7 @@ Source: `src-test/src/org/openbravo/test/dal/DalTest.java` — `DalTest#testASav
 
 ## DalUtil
 
-`DalUtil` holds static helpers for [property paths](./05-glossary.md#property-path), copying and proxy-safe access to business objects (`DalUtil#getValueFromPath`, `DalUtil#copy(BaseOBObject)`, `DalUtil#getEntityName(Object)`).
+Module code picks a static `DalUtil` helper by what it needs: for a dot-separated [property path](./05-glossary.md#property-path), `DalUtil#getPropertyFromPath` returns the property the path names and `DalUtil#getValueFromPath` the value it reaches (`DalUtil#getPropertyFromPath`, `DalUtil#getValueFromPath`). To copy, `DalUtil#copy(BaseOBObject)` copies one object with its children and a null id, `DalUtil#copy(BaseOBObject, boolean)` lets the caller choose whether children are copied, `DalUtil#copy(BaseOBObject, boolean, boolean)` also whether the id is reset, `DalUtil#copyAll(List, boolean)` copies a list of objects with their children and lets the caller choose whether the ids are reset, and `DalUtil#copyToTarget(BaseOBObject, BaseOBObject, boolean, List)` copies into an existing object, with arguments that choose whether children are copied and which properties are left out (`DalUtil#copy(BaseOBObject)`, `DalUtil#copy(BaseOBObject, boolean)`, `DalUtil#copy(BaseOBObject, boolean, boolean)`, `DalUtil#copyAll(List, boolean)`, `DalUtil#copyToTarget(BaseOBObject, BaseOBObject, boolean, List)`). For proxy-safe access, `DalUtil#getEntityName(Object)` returns the entity name of an object that can be a Hibernate proxy without loading it (`DalUtil#getEntityName(Object)`).
 
 ### Property paths
 
@@ -445,6 +445,6 @@ Source: `src-test/src/org/openbravo/test/dal/DalTest.java` — `DalTest#testASav
 
 ### Proxy-safe access
 
-- `DalUtil#getId(Object)` is deprecated; its Javadoc says it is not needed for lazy loading of the id of a proxy and is kept for backwards compatibility (`DalUtil#getId`). It returns the identifier held by a Hibernate proxy without loading the object, or `BaseOBObject#getId` for a business object, and throws `ArgumentException` for anything else (`DalUtil#getId`).
+- `DalUtil#getId(Object)` is deprecated (`DalUtil#getId`). It returns the identifier held by a Hibernate proxy without loading the object, or `BaseOBObject#getId` for a business object, and throws `ArgumentException` for anything else (`DalUtil#getId`).
 - `DalUtil#getEntityName(Object)` uses the persistent class of a Hibernate proxy, so the object is not loaded, or the object's own class otherwise, and reads the `ENTITY_NAME` field through `DalUtil#getEntityName(Class)` (`DalUtil#getEntityName(Object)`).
 - `DalUtil#getReferencedPropertyValue(Property, Object)` fails with `Check.isTrue` when the property has no referenced property (`DalUtil#getReferencedPropertyValue`). When the referenced property is an id, it returns the identifier held by a Hibernate proxy without loading it, or `BaseOBObject#getId`; otherwise it returns the referenced property's value read with `BaseOBObject#get(String)` (`DalUtil#getReferencedPropertyValue`). Any other argument raises `ArgumentException` (`DalUtil#getReferencedPropertyValue`).
