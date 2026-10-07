@@ -2,77 +2,81 @@
 
 ## 1. What Openbravo is
 
-Openbravo is ERP (enterprise resource planning) software: one shared system in which a company records its daily business, such as sales, purchasing, stock, manufacturing and accounting. Its users are the staff who do that work, in screens such as Sales Order and Sales Invoice, and administrators who manage users and permissions. People use it in a web browser, which talks to an application server (the central program that does the work), and every record is kept in a database (an organised store of tables). Think of a house built from one master plan: the [Application Dictionary](orm/05-glossary.md#application-dictionary-ad) describes every room (screen) and cupboard (table), a builder turns the plan into the house, and add-on packages called modules extend the plan.
+Openbravo is ERP (enterprise resource planning) software: one shared system where a company's staff record sales, purchasing, stock, manufacturing and accounting. They work in a web browser (a program for viewing websites), which talks to an application server (the central program doing the work). The server keeps each record, such as an order, in a database: an organised store of tables (lists of records of one kind). Think of a house built from one master plan, the [Application Dictionary](orm/05-glossary.md#application-dictionary-ad): a builder turns it into rooms (screens), and add-on modules extend it.
 
 ## 2. How complex it is
 
-Overall rating: **Very High**.
+Rating: **Very High**.
 
-The repository (the project's stored files) holds hundreds of tables, screens and database routines. Business rules are split between the Java code (the server's programming language) and the database, which targets two database engines (database products).
+The repository (the project's stored files) holds hundreds of tables, screens and stored procedures (business steps run inside the database). Business rules are split between the database and Java code (the server's written instructions).
 
-| What we counted | Core | Modules | How we counted it |
+| What we counted | Core (base module) | Modules (add-ons) | How we counted it |
 | --- | --- | --- | --- |
 | Modules | 1 | 20 | the record in `src-db/database/sourcedata/AD_MODULE.xml`; folders in `modules/` |
-| Java source files, tests excluded | 1,428 | 502 | .java files outside every `src-test` folder |
+| Java program files, excluding automated tests (code that checks code) | 1,428 | 502 | .java files outside every `src-test` folder |
 | Database tables | 561 | 45 | .xml files in `src-db/database/model/tables` |
-| Stored procedures (business steps run inside the database) | 287 | 12 | .xml files in `src-db/database/model/functions` |
-| Triggers (rules the database runs when data changes) | 277 | 53 | .xml files in `src-db/database/model/triggers` |
-| Screens | 254 | 30 | window records in `src-db/database/sourcedata/AD_WINDOW.xml` |
-| Web-service entry points (addresses where other programs exchange data) | 1 | 2 | address records in `src-db/database/sourcedata/AD_MODEL_OBJECT_MAPPING.xml` that lead to web services |
-| Other outside connections; lines of code, effort, cost | not measured | not measured | not counted or estimated |
+| Stored procedures | 287 | 12 | .xml files in `src-db/database/model/functions` |
+| Triggers (rules the database runs by itself on certain changes) | 277 | 53 | .xml files in `src-db/database/model/triggers` |
+| Screens | 254 | 30 | window (screen) records in `src-db/database/sourcedata/AD_WINDOW.xml` |
+| Web-service entry points (addresses where other programs exchange data) | 1 | 2 | web-service address records in `src-db/database/sourcedata/AD_MODEL_OBJECT_MAPPING.xml` |
+| Other outside connections; lines of code, effort, cost | not measured | not measured | not counted |
 
-How we measured: read-only counts of tracked files and of records inside them. Each database model file defines one object. Core figures cover everything outside `modules/`, and module figures come from the matching folder or file in each module. Nothing was run.
+How we measured: we counted repository files, and records inside them. Each database definition file describes one table, procedure or trigger. Core figures cover everything outside `modules/`; module figures come from each module's matching folder or file.
 
-The [Data Access Layer (DAL)](orm/05-glossary.md#data-access-layer-dal), the Java layer that reads and saves records, has its own documentation. [Its service API page](orm/03-dal-service-api.md) covers 102 public members of 4 service classes. [Its security page](orm/04-security-and-filtering.md#what-admin-mode-skips) has a 4 x 3 matrix showing which of 3 kinds of check [admin mode](orm/05-glossary.md#admin-mode) (code running with administrator privileges) skips in 4 user situations. The bold label "Ambiguity:" appears 24 times in DAL pages 01 to 04 (3 in [architecture](orm/01-architecture.md), 8 in [runtime model](orm/02-runtime-model.md), 5 in service API, 8 in security). One of them only explains the label. The other 23 each mark where a code comment and the code disagree, and none is settled.
+The [Data Access Layer (DAL)](orm/05-glossary.md#data-access-layer-dal) is the Java code that reads and saves records. Its API is what other code can ask it to do. [Its service API page](orm/03-dal-service-api.md) lists 102 public members (operations and named values) in 4 service classes (code units). [Its security page](orm/04-security-and-filtering.md#what-admin-mode-skips) has a 4 x 3 admin-mode matrix (a table). It shows, for 4 user situations, which of 3 kinds of check [admin mode](orm/05-glossary.md#admin-mode) (code running with administrator privileges) skips. Comments are programmers' notes in the code. The DAL pages hold 24 code-versus-comment disagreements and open questions, none settled. Counted by the bold label "Ambiguity:", there are 3 in [architecture](orm/01-architecture.md), 8 in [runtime model](orm/02-runtime-model.md) (how data is described), 5 in service API and 8 in security.
 
 ## 3. Main components
 
 | Component | What it does in plain English | Where it lives in the repository |
 | --- | --- | --- |
-| Application Dictionary | Metadata (data that describes other data) for every table, screen, button and process. | `src-db/database/sourcedata` |
-| Code generator and build system | Builds the database, generates program code from the Application Dictionary and packages the result. | `build.xml`, `src-wad`, `src-core` |
-| Module system and core module | Modules add or change features. The core module, named Core, is the base. | `modules/`; Core's record in `src-db/database/sourcedata/AD_MODULE.xml` |
-| Data Access Layer (DAL) | Reads and saves data as business objects (records the program can work with) and applies security checks. See [the DAL architecture page](orm/01-architecture.md). | `src/org/openbravo/dal` |
-| Database layer | Stores the records and runs the stored procedures and triggers (section 4). | `src-db/database/model` |
-| Security | Checks who a user is. Their [role](orm/05-glossary.md#role) (a group of permissions) has access rules for screens, processes and tables. Data is limited to their [client](orm/05-glossary.md#client) (an independent business) and its [organizations](orm/05-glossary.md#organization) (companies or units). | `src/org/openbravo/authentication`, `src/org/openbravo/role` |
-| Browser user-interface framework | Draws the screens in the browser from their definitions and sends user actions to the server. | `modules/org.openbravo.client.application`, `web/` |
-| Business processes | Orders, shipments, invoices, payments, stock, costing and accounting, split between Java code and stored procedures. | `src/org/openbravo/erpCommon`, `modules/org.openbravo.advpaymentmngt` |
-| Web services and integration points | Let other programs read or send data without the screens. Connector code links to outside systems. | `src/org/openbravo/service`, `modules/org.openbravo.service.json` |
-| Reporting, scheduling and background services | Report layouts, a scheduler that runs processes at set times, and a background import service. | `src/org/openbravo/erpReports`, `src/org/openbravo/scheduling`, `src/org/openbravo/service/importprocess` |
+| Application Dictionary | Metadata (data that describes other data) for every table, screen, button and process (a business task a user can start). | `src-db/database/sourcedata` |
+| Code generator and build system | Prepares the application for use: creates the database, writes code from the Dictionary, bundles the result. | `build.xml`, `src-wad`, `src-core` |
+| Installation and upgrade checks | Checks an installation can be upgraded, and adjusts existing data during upgrades. | `src-util/buildvalidation`, `src-util/modulescript` |
+| Module system and core module | Modules add or change features on top of Core. | `modules/`, `src-db/database/sourcedata/AD_MODULE.xml` |
+| Data Access Layer (DAL) | Reads and saves records as business objects (data the program can work with), with security checks. See [the DAL pages](#7-where-to-go-next), starting with [architecture](orm/01-architecture.md). | `src/org/openbravo/dal` |
+| Database layer | Stores records and runs stored procedures and triggers (section 4). | `src-db/database/model` |
+| Security | Checks who a user is. Their [role](orm/05-glossary.md#role) (a group of permissions) has access rules for screens, processes and tables. DAL searches keep to the user's [client](orm/05-glossary.md#client) (an independent business), the [organizations](orm/05-glossary.md#organization) (companies or units) their role may read and shared system data. This applies only to records with a client or organization, while the search's filter is on, and not to single-record fetches ([filtering limits](orm/04-security-and-filtering.md#client-organization-and-active-filtering)). | `src/org/openbravo/authentication`, `src/org/openbravo/role` |
+| Browser user-interface framework | Draws screens in the browser from their definitions. Its server services check access and save through the DAL. | `modules/org.openbravo.client.application`, `modules/org.openbravo.service.datasource`, `web/` |
+| Business processes | Orders, shipments, invoices, payments, stock, costing (working out what stock costs) and accounting. | `src/org/openbravo/erpCommon`, `modules/org.openbravo.advpaymentmngt` |
+| Web services and integration points | Let other programs read or send data without the screens, and connect to outside systems. | `src/org/openbravo/service`, `modules/org.openbravo.service.json` |
+| Reporting, scheduling and background services | Report layouts, a scheduler for timed processes, and an import service that loads data with no screen open. | `src/org/openbravo/erpReports`, `src/org/openbravo/scheduling`, `src/org/openbravo/service/importprocess` |
 | Reference and sample data | Standard settings and two sample data sets. | `referencedata/` |
-| Configuration | Settings for each installation, such as the database engine. | `config/` |
-| Translation tools | Translate the application into other languages. | `src-trl/` |
+| Configuration | Settings for each installation, such as the database engine (database product). | `config/` |
+| Shared libraries | Ready-made building blocks bundled into the application, for database access, reports and timed tasks. | `lib/runtime` |
+| Translation tools | Collect screen and report text for translation, and prepare screen styles for right-to-left languages. | `src-trl/` |
 | Automated tests | Code that checks that other code works. | `src-test/` |
 
 ## 4. Stored procedures
 
 ### What a stored procedure is
 
-A stored procedure is a named set of business steps that runs inside the database rather than in the application server. Think of a standing order at a bank: you give one short instruction, and the bank carries out every step itself. A [database trigger](orm/05-glossary.md#database-trigger) is a related stored rule that the database runs by itself whenever rows of a table change.
+A stored procedure is a named set of business steps that runs inside the database rather than in the application server. Think of a standing order at a bank: you give one instruction, and the bank carries out every step itself. A [database trigger](orm/05-glossary.md#database-trigger) is a related rule the database runs by itself on certain changes to its table, unless triggers are switched off.
 
-### What they do, by business area
+**Why they are used:** the repository states no design reason, so it is not verified. It shows history: `legal/CompiereAddendum.txt` lists 136 procedures and triggers that Compiere Inc. first wrote and Openbravo later modified.
 
-- **Document completion and posting.** `C_ORDER_POST` processes an order. It checks that the order has lines and an active business partner, works out promotions and discounts, reserves stock and, for some order types, creates the invoice or shipment. `C_INVOICE_POST` completes, voids or reverses an invoice, and blocks a repeated document number in the same organization group and fiscal year.
-- **Inventory and costing.** `M_INOUT_POST` completes a goods shipment or receipt. It records stock movements, manages reservations and updates the delivered quantities on the order. `M_INVENTORY_POST` records the differences found by a physical stock count. Costing is split between Java code and procedures.
-- **Data integrity checks.** `C_CHK_OPEN_PERIOD` tells whether the accounting period is open for a date and document type, and the shipment and invoice procedures use it. Triggers also do this work: one refuses changes to an order that is already processed.
+### Business areas
 
-### How many, and for which database engines
+- **Completing documents.** `C_ORDER_POST` processes an order. It checks the order, works out promotions and discounts, and reserves stock. For some order types it also creates the invoice or shipment. `C_INVOICE_POST` completes, voids or reverses an invoice.
+- **Stock.** `M_INOUT_POST` completes a goods shipment or receipt. It updates stock, reservations and the order's delivered quantities. `M_INVENTORY_POST` records differences found by a physical stock count.
+- **Checks that keep data correct.** `C_CHK_OPEN_PERIOD` tells whether a date's accounting period (a span of dates in the books) still accepts entries for a document type. One trigger blocks certain changes to processed orders.
 
-There are 299 stored procedures (287 in core, 12 in modules) and 330 triggers (277 in core, 53 in modules), counted as in section 2. The configuration template names two engines, Oracle and PostgreSQL, with PostgreSQL as the default, and the build has a final step for each. Each procedure is stored once, with separate setup scripts per engine. How one stored definition becomes code for each engine is not verified: the tool that does it ships only in compiled form.
+### Counts and engines
 
-### How they relate to the Java side
+Counted as in section 2, there are 299 stored procedures (287 core, 12 modules) and 330 triggers (277 core, 53 modules). The sample settings file `config/Openbravo.properties.template` names two engines, Oracle and PostgreSQL (the default). Each procedure is stored once; preparation scripts (files of database instructions) differ per engine. How one definition becomes code for each engine is not verified.
 
-The application calls procedures in three ways. Buttons and menu entries run them: 93 of the 227 core process records (actions a user can start) in `src-db/database/sourcedata/AD_PROCESS.xml` name a procedure. Java code calls them through two helper services. Modules can add steps at 22 extension points (named places inside core procedures) in `src-db/database/sourcedata/AD_EXTENSION_POINTS.xml`.
+### The Java side
 
-So there are two routes to the same data. On the DAL route, Java code saves records through the DAL, which applies [its access checks](orm/04-security-and-filtering.md#access-checks) and records who changed what. On the procedure route, the procedure changes rows directly inside the database, outside those Java checks, and makes its own checks. Triggers run on both routes.
+Buttons and menu entries are one way to call procedures: 93 of the 227 core process records in `src-db/database/sourcedata/AD_PROCESS.xml` name one. Java code can use two helper services (server tools that start a procedure), and some business code calls procedures directly. Modules can add steps at 22 extension points (named places inside core procedures) in `src-db/database/sourcedata/AD_EXTENSION_POINTS.xml`.
 
-**What could surprise you:** after a procedure runs, records that Java code loaded earlier may not show its changes. The helper that runs processes re-reads only its own run record; whether other loaded records show old values is not verified. Java code can also switch triggers off, and the DAL then refuses to commit (save permanently) until they are back on.
+So there are two routes to the same data. On the DAL route, Java code saves through the DAL, which applies [its access checks](orm/04-security-and-filtering.md#access-checks) (admin mode skips some). If a record has fields for this, the DAL also notes who created or last changed it, and when. On the procedure route, the procedure changes records directly, outside those Java checks, with its own checks. On both routes, triggers act on the changes they cover while switched on.
 
-### Why they raise complexity and risk
+**What could surprise you:** records that Java code loaded before a procedure ran may not show its changes. The process helper re-reads only its own run record; what other records show is not verified. Java code can also switch triggers off. The usual DAL commit (permanent save) then refuses to run. That check trusts the DAL's own note, not the database, and one cleanup path skips it.
 
-- **Logic in two places.** Orders have rules in a Java event handler (code run when an order changes) and in database triggers and procedures, so one change can need two edits.
-- **Engine-specific code.** The setup scripts, and the code that calls a procedure, differ between Oracle and PostgreSQL.
-- **Harder testing.** Procedures are tested through Java tests in `src-test` that need a running database. No tests sit beside the procedure files in `src-db`.
+### Complexity and risk
+
+- **Logic in two places.** Order rules sit in a Java event handler (code run when an order changes) and in database triggers and procedures. One change can need two edits.
+- **Engine-specific code.** Preparation scripts and procedure calls differ between Oracle and PostgreSQL.
+- **Harder testing.** Procedure tests are Java tests in `src-test` that need a running database; none sit beside the procedure files in `src-db`.
 
 ## 5. How the pieces fit together
 
@@ -85,46 +89,63 @@ flowchart LR
   S -->|"reads and saves records"| DAL["Data Access Layer (DAL)"]
   DAL --> DB[("Database tables")]
   S -->|"process buttons and calls"| SP["Stored procedures"]
-  SP -->|"change rows directly"| DB
-  DB -->|"every row change"| T["Database triggers"]
+  SP -->|"change records directly"| DB
+  DB -->|"matching changes, while switched on"| T["Database triggers"]
 ```
 
-Diagram sources: `modules/org.openbravo.client.application`, `modules/org.openbravo.client.kernel`, `src/org/openbravo/authentication`, `src/org/openbravo/service/web`, `src-db/database/sourcedata/AD_MODEL_OBJECT_MAPPING.xml`, `src-db/database/sourcedata/AD_WINDOW.xml`, `src-db/database/sourcedata/AD_PROCESS.xml`, `src/org/openbravo/dal`, `docs/orm/01-architecture.md`, `src/org/openbravo/service/db/CallProcess.java`, `src/org/openbravo/service/db/CallStoredProcedure.java`, `src-wad/src/org/openbravo/wad/ActionButton_Responser.javaxml`, `src-db/database/model/tables`, `src-db/database/model/functions`, `src-db/database/model/triggers`.
+Diagram sources: `modules/org.openbravo.client.application`, `modules/org.openbravo.client.kernel`, `src/org/openbravo/authentication`, `src/org/openbravo/service/web`, `src-db/database/sourcedata/AD_MODEL_OBJECT_MAPPING.xml`, `src-db/database/sourcedata/AD_WINDOW.xml`, `src-db/database/sourcedata/AD_PROCESS.xml`, `src/org/openbravo/dal`, `docs/orm/01-architecture.md`, `src/org/openbravo/service/db/CallProcess.java`, `src/org/openbravo/service/db/CallStoredProcedure.java`, `src-wad/src/org/openbravo/wad/ActionButton_Responser.javaxml`, `src-db/database/model/tables`, `src-db/database/model/functions`, `src-db/database/model/triggers`, `src-db/database/model/triggers/C_ORDER_CHK_RESTRINCTIONS_TRG.xml`, `src/org/openbravo/dal/core/TriggerHandler.java`.
 
 ## 6. A typical day in the system
 
 A sales clerk takes a customer's order.
 
-1. **Sign in (security).** The system checks the password and sets the clerk's role, client and organization, the [user context](orm/05-glossary.md#user-context).
+1. **Sign in (security).** The system checks the password and sets the clerk's role, client and organization: the [user context](orm/05-glossary.md#user-context).
 2. **Open Sales Order (user-interface framework, Application Dictionary).** The browser draws the screen from its definition, if the role has access.
-3. **Save the order (DAL, database layer).** The DAL checks that the role may write it and records who saved it. Triggers check the change too.
-4. **Process the order (business processes).** The clerk presses the button linked to the process Process Order, whose procedure is `C_ORDER_POST`.
-5. **The procedure runs (stored procedures).** The server records the run and the database runs the procedure, which checks the order, works out discounts, reserves stock and completes it. Its message returns to the clerk.
-6. **Ship and invoice (business processes, reporting).** Completing the shipment and the invoice later runs `M_INOUT_POST` and `C_INVOICE_POST`. The Orders Awaiting Delivery report lists orders not yet delivered.
+3. **Save the order (user-interface framework, security, DAL, database layer).** Server services check the role may edit this screen. The DAL then saves in admin mode, skipping its own write check. Order triggers also check the change while switched on.
+4. **Process the order (business processes, stored procedures).** The clerk presses Process Order. The server records the run, then the database runs `C_ORDER_POST`. It checks the order, reserves stock and completes it.
+5. **Ship and invoice (business processes).** Completing the shipment and invoice later runs `M_INOUT_POST` and `C_INVOICE_POST`.
 
 ## 7. Where to go next
 
-- [Architecture of the Data Access Layer](orm/01-architecture.md): architects and developers wanting the big picture.
+- [Architecture of the Data Access Layer](orm/01-architecture.md): architects and developers wanting an overview.
 - [Runtime model](orm/02-runtime-model.md): developers learning how tables become business objects.
 - [DAL service API](orm/03-dal-service-api.md): developers writing code that reads or saves data.
-- [Security and filtering](orm/04-security-and-filtering.md): developers, testers and analysts asking why a user sees fewer records or a save fails.
+- [Security and filtering](orm/04-security-and-filtering.md): developers, testers and analysts asking why records are hidden or a save fails.
 - [Glossary](orm/05-glossary.md): anyone meeting an unfamiliar DAL term.
 
 ## 8. What this overview does not cover
 
-- **Sampled, not read in full:** procedure and trigger bodies (a handful were read, including the five named ones), the Java business code, the user-interface modules, web services, reports and the scheduler. Counts cover every file.
+- **Sampled, not read in full:** every component in section 3, including the contents of procedures and triggers (a handful were read, including the five named). Counts cover every file.
 - **Nothing was run:** no application code, build, database or stored procedure.
-- **No maintainer sign-off:** the project guide records that no Openbravo DAL maintainer has yet signed off on the technical accuracy of the DAL documentation.
+- **No maintainer sign-off:** the project guide records that no DAL maintainer has yet signed off on the DAL documentation's accuracy.
 
 Basis:
 
 - `README`
 - `legal/Licensing.txt`
+- `legal/CompiereAddendum.txt`
 - `build.xml`
 - `src/build.xml`
+- `config/`
 - `config/Openbravo.properties.template`
 - `config/quartz.properties.template`
+- `lib/runtime`
 - `modules/`
+- `modules/*/src-db/database/sourcedata`
+- `modules/*/src-db/database/model`
+- `src/`
+- `src-core/`
+- `src-util/`
+- `src-util/buildvalidation`
+- `src-util/buildvalidation/src/org/openbravo/buildvalidation/CostingMigrationCheck.java`
+- `src-util/buildvalidation/src/org/openbravo/buildvalidation/DatabaseVersionCheck.java`
+- `src-util/modulescript`
+- `src-util/modulescript/src/org/openbravo/modulescript/UpdateIsCompletelyInvoiced.java`
+- `src-wad/`
+- `src-test/`
+- `src-db`
+- `src-db/database/sourcedata`
+- `src-db/database/model`
 - `src-db/database/sourcedata/AD_MODULE.xml`
 - `src-db/database/sourcedata/AD_WINDOW.xml`
 - `src-db/database/sourcedata/AD_TABLE.xml`
@@ -151,36 +172,55 @@ Basis:
 - `src-db/database/model/postscript-PostgreSql.sql`
 - `src-db/database/build.xml`
 - `src-db/database/lib/dbsourcemanager.jar`
-- `src-db/database/sourcedata` and `src-db/database/model` in each folder under `modules/`
 - `src-wad/src/org/openbravo/wad/Wad.java`
 - `src-wad/src/org/openbravo/wad/WadActionButton.java`
 - `src-wad/src/org/openbravo/wad/ActionButton_Responser.javaxml`
 - `src-wad/src/org/openbravo/wad/ActionButton_data.xsqlxml`
 - `src-core/src/org/openbravo/data/Sqlc.java`
 - `src-trl/`
+- `src-trl/src/org/openbravo/translate/Translate.java`
+- `src-trl/src/org/openbravo/translate/RTLSkin.java`
+- `src/org/openbravo/erpCommon`
 - `src/org/openbravo/erpCommon/modules`
+- `src/org/openbravo/erpCommon/modules/ApplyModule.java`
 - `src/org/openbravo/erpCommon/ad_process/ConvertQuotationIntoOrder.java`
+- `src/org/openbravo/erpCommon/businessUtility/ReplaceOrderExecutor.java`
 - `src/org/openbravo/erpReports`
 - `src/org/openbravo/materialmgmt`
+- `src/org/openbravo/materialmgmt/InventoryCountProcess.java`
 - `src/org/openbravo/costing`
 - `src/org/openbravo/event/OrderEventHandler.java`
 - `src/org/openbravo/authentication`
 - `src/org/openbravo/role`
 - `src/org/openbravo/dal`
+- `src/org/openbravo/dal/core/OBContext.java`
+- `src/org/openbravo/dal/core/OBInterceptor.java`
+- `src/org/openbravo/dal/core/SessionHandler.java`
 - `src/org/openbravo/dal/core/TriggerHandler.java`
+- `src/org/openbravo/dal/service/OBCriteria.java`
+- `src/org/openbravo/dal/service/OBQuery.java`
+- `src/org/openbravo/dal/service/OBDal.java`
 - `src/org/openbravo/base`
+- `src/org/openbravo/scheduling`
 - `src/org/openbravo/scheduling/OBScheduler.java`
+- `src/org/openbravo/service`
+- `src/org/openbravo/service/importprocess`
 - `src/org/openbravo/service/importprocess/ImportEntryManager.java`
+- `src/org/openbravo/service/web`
 - `src/org/openbravo/service/web/WebServiceServlet.java`
 - `src/org/openbravo/service/externalsystem/ExternalSystem.java`
 - `src/org/openbravo/service/db/CallProcess.java`
 - `src/org/openbravo/service/db/CallStoredProcedure.java`
+- `src/org/openbravo/service/db/DalConnectionProvider.java`
 - `modules/org.openbravo.client.kernel`
+- `modules/org.openbravo.client.application`
 - `modules/org.openbravo.client.application/src/org/openbravo/client/application/window/StandardWindowComponent.java`
 - `modules/org.openbravo.service.json`
+- `modules/org.openbravo.service.json/src/org/openbravo/service/json/DefaultJsonDataService.java`
 - `modules/org.openbravo.service.datasource`
+- `modules/org.openbravo.service.datasource/src/org/openbravo/service/datasource/DataSourceServlet.java`
+- `modules/org.openbravo.service.datasource/src/org/openbravo/service/datasource/DefaultDataSourceService.java`
 - `modules/org.openbravo.advpaymentmngt`
-- `modules/org.openbravo.reports.ordersawaitingdelivery`
 - `web/`
 - `referencedata/`
 - `src-test/src/org/openbravo/test/base/OBBaseTest.java`
