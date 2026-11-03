@@ -2,158 +2,162 @@
 
 ## Key Takeaways
 
-- A bank file reaches posted entries (`FACT_ACCT`) in twelve steps, most started by a person.
-- People act at 40 points; the per-line ones sit in the `Match Statement` screen.
+- A bank file reaches the company's books (`FACT_ACCT`) in twelve steps, most started by a person.
+- People act at 40 points, the per-line ones in the `Match Statement` screen.
 - The rules (`StandardMatchingAlgorithm`) need exact amounts, take the first match and wait for a user.
-- No unmatched line has an owner, reason code or status, and age is only derivable (`FIN_BANKSTATEMENTLINE`).
+- No unmatched line records who must fix it or why, or shows how old it is (`FIN_BANKSTATEMENTLINE`).
 - Per-line resolution is the top effort (`APRM_MatchingUtility`); match rates are not determinable from code.
 
 ## 1. End-to-End Flow from Statement Import to Posted Reconciliation
 
-**What this section tells you:** How a bank file becomes a completed, posted reconciliation today, step by step. Every stage up to completion waits for a person, and a reconciliation can be completed while lines are still unmatched (Section 1.2, Figures 1 to 3).
+**What this section tells you:** This section traces how a bank file reaches the company's books today. Each stage before the bank balance is confirmed waits for a person, and confirmation can leave bank lines unlinked (Section 1.2, Figures 1 to 3).
 
 ### 1.1 How the Pieces Fit
 
-The business objective is to "reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." A reconciliation is the period document confirming the ERP (business-management software) balance agrees with the bank (`FIN_RECONCILIATION`), and cycle time runs from statement import to completed reconciliation. An unmatched item's owner is the person accountable for resolving it, its age is how long it has been open, and a reason code records why it is unresolved; Appendix A collects every defined term.
+The business objective is to "reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." In this ERP (business-management software), a reconciliation is the period document confirming the ERP balance agrees with the bank (`FIN_RECONCILIATION`), and cycle time is the time from statement import to completed reconciliation. An unmatched item's owner is the person accountable for resolving it, its age is how long it has been open, and its reason code is a record of why it is unresolved; Appendix A collects every defined term.
 
-Apart from its data tables (stores of records) and accounting step (step 12), both in the core product, the flow lives in one module (a separately packaged part of the ERP), Advanced Payables and Receivables Management, `modules/org.openbravo.advpaymentmngt`. Everything hangs off the financial account (the ERP record for one bank account), kept in the `Financial Account` window (a data-entry screen): bank statements and their bank statement lines (one entry on the statement the bank sends) in `FIN_BANKSTATEMENT` and `FIN_BANKSTATEMENTLINE`, transactions (the ERP's record of money expected in or out of a financial account) in `FIN_FINACC_TRANSACTION`, and reconciliations in `FIN_RECONCILIATION`. So these records and lists cover one account at a time (`FIN_FINANCIAL_ACCOUNT_ID`; rule records can be shared, Section 3.2), which matters for any screen working exceptions (unmatched lines) across accounts.
-
-Two account settings decide whether an account uses matching (linking a statement line to the transaction it settles). Only a bank-type account with a matching algorithm record (a saved set of matching rules that one or more financial accounts use) selected in `FIN_MATCHING_ALGORITHM_ID` shows the `Import Statement` and `Match Statement` buttons, and Section 1.2 follows these accounts. A cash account, or one with no record selected, is reconciled by hand instead (Section 1.3).
+Except for its data tables (stores of records) and accounting step (step 12), both in the core product, the flow lives in one module (a separately packaged part of the ERP), Advanced Payables and Receivables Management (`modules/org.openbravo.advpaymentmngt`). Everything hangs off the financial account (the ERP record for one bank account), kept in the `Financial Account` window (a data-entry screen): statements and their bank statement lines (one entry on the statement the bank sends) in `FIN_BANKSTATEMENT` and `FIN_BANKSTATEMENTLINE`, transactions (the ERP's record of money expected in or out of a financial account) in `FIN_FINACC_TRANSACTION`, and reconciliations in `FIN_RECONCILIATION`. These records, their lists and matching (linking a statement line to the transaction it settles) cover one account at a time (`FIN_FINANCIAL_ACCOUNT_ID`; rule records can be shared, Section 3.2), which matters for working exceptions (unmatched lines) across accounts. Section 1.2 follows bank accounts selecting a matching algorithm record (a saved set of matching rules that one or more financial accounts use) in `FIN_MATCHING_ALGORITHM_ID`; Section 1.3 covers the rest.
 
 ### 1.2 Step-by-Step Flow
 
-The walkthrough has twelve steps in three stages: import (steps 1 to 4, Figure 1), matching (steps 5 to 9, Figure 2), and completion and posting (creating the accounting entries in the general ledger, the company's books; steps 10 to 12, Figure 3). Each step gives what happens, the window or class (a program unit) doing it, the tables and what the user sees; Sections 2 to 4 detail actions, matching and exceptions.
+Twelve steps form three stages: import (steps 1 to 4, Figure 1), matching (steps 5 to 9, Figure 2), and completion and posting (creating the accounting entries in the general ledger, the company's books; steps 10 to 12, Figure 3). Read stage handoffs as waits for a user, not line-resolution work (Sections 2 to 4).
 
 **Figure 1. Import and Statement Processing**
 
 ```mermaid
 flowchart TD
-    A["User clicks Import Statement (ImportBankFile)"] --> B{"Is a file format installed?"}
-    B -->|No| C["Warning: install a format module (APRM_NoBankFileAvailableInfo)"]
+    accTitle: Figure 1. Import and Statement Processing
+    accDescr: Diamonds are system checks; only one path reaches matching.
+    A["User clicks Import Statement (ImportBankFile)"] --> B{"Format installed?"}
+    B -->|No| C["Warning: no format (APRM_NoBankFileAvailableInfo)"]
     B -->|Yes| D["User picks format and file (FIN_BANKFILE_FORMAT)"]
-    D --> E["File read into a new statement (FIN_BankStatementImport)"]
+    D --> E["File read into a statement (FIN_BankStatementImport)"]
     E --> F{"Read without error?"}
-    F -->|No| G["Error shown, nothing saved (APRM_InvalidOrMissingValues)"]
+    F -->|No| G["Error, nothing saved (APRM_InvalidOrMissingValues)"]
     F -->|Yes| H["Zero-amount lines dropped, partners guessed (FIN_BANKSTATEMENTLINE)"]
     H --> I["Statement processed at once (FIN_BankStatementProcess)"]
-    I --> J{"Any line dated on or before the last processed date?"}
-    J -->|Yes| K["Left unprocessed with a date warning (APRM_BankStatementLineWrongDateWarning)"]
+    I --> J{"Any line on or before the last processed date?"}
+    J -->|Yes| K["Date warning, left unprocessed (APRM_BankStatementLineWrongDateWarning)"]
     J -->|No| L["Ready for matching (FIN_BANKSTATEMENT)"]
 ```
 
-**How to read this:** Follow the arrows down; diamonds are system checks, and each path ends in a message or a statement ready for matching.
+**How to read this:** Diamonds are system checks; only one path reaches matching.
 
 1. **Start the import.**
-   - **What happens:** A finance user clicks `Import Statement` (`EM_APRM_IMPORTBANKFILE`), and the system checks that a bank file format (one bank's file layout) is installed. `ImportBankFile` accepts only a file the user uploads, so how files arrive from the bank is not determinable from code.
-   - **Done by:** the `Financial Account` window and `ImportBankFile`, an older hand-built screen.
+   - **What happens:** A finance user clicks `Import Statement` (`EM_APRM_IMPORTBANKFILE`); the system checks that a bank file format (one bank's file layout) is installed. `ImportBankFile` takes only uploaded files, so how bank files arrive is not determinable from code.
+   - **Done by:** the `Financial Account` window and the `ImportBankFile` class (a program unit), which provides an older hand-built screen.
    - **Tables:** reads `FIN_FINANCIAL_ACCOUNT` and `FIN_BANKFILE_FORMAT`.
-   - **User sees:** a pop-up with a file chooser and format list or, with none installed, `APRM_NoBankFileAvailableInfo` asking an administrator to install a format module.
+   - **User sees:** a pop-up to choose the file and format or, with none installed, `APRM_NoBankFileAvailableInfo` asking an administrator for a format module.
 2. **Load the file into a new statement.**
-   - **What happens:** On OK, the system creates the statement header, named with its number and file name, and the format's importer (the program that reads that layout) turns each entry into a bank statement line; any failure undoes the whole import (`ImportBankFile`).
+   - **What happens:** On OK, the system creates the statement, and the format's importer (the program that reads a bank file format) turns each entry into a bank statement line; any failure undoes the import (`ImportBankFile`).
    - **Done by:** `ImportBankFile`, running the format's importer, built on `FIN_BankStatementImport`.
    - **Tables:** reads `FIN_BANKFILE_FORMAT` and the statement document type (the setting that numbers a kind of document) in `C_DOCTYPE`; writes `FIN_BANKSTATEMENT` and `FIN_BANKSTATEMENTLINE`.
-   - **User sees:** on failure, `APRM_InvalidOrMissingValues` (unreadable values), `APRM_DocumentTypeNotFound` (no numbering) or `APRM_WrongBankFileFormat` (importer not installed), with nothing kept.
+   - **User sees:** on failure, `APRM_InvalidOrMissingValues` (unreadable values), `APRM_DocumentTypeNotFound` (no numbering) or `APRM_WrongBankFileFormat` (importer not installed).
    - **Unconfirmed:** which bank file formats an installation can import, because no code in this repository implements the importer, so formats come from separately installed modules (consulted `FIN_BankStatementImport`, `ImportBankFile`, `APRM_NoBankFileAvailableInfo`).
 3. **Drop zero-amount lines and guess partners.**
-   - **What happens:** Lines with zero credit and debit are discarded. Each other line takes its business partner (customer or supplier) and GL item (a general-ledger category for amounts with no invoice, such as bank fees) from the latest earlier line on the account with the same name, ignoring spaces and differences between digits; else from the partner with exactly that name; else, ignoring the words in `FIN_BANKFILE_EXCEPTION` and words of three letters or fewer, from the only partner sharing a name word. With several such partners, closest-name selection fails and the partner stays blank, so `Add Transaction` opens with no partner filled in (`AddTransactionFilterExpression`).
+   - **What happens:** Lines with no money in or out are discarded (`FIN_BankStatementImport`). A line's business partner (a customer or supplier) or GL item (a general-ledger category for amounts with no invoice, such as bank fees), if the importer left it empty, is filled separately from the newest of up to ten recent processed (confirmed) same-name lines on the account that holds one, ignoring spaces and differences between digits (`FIN_BANKSTATEMENTLINE`). A partner still missing comes from the partner with exactly that name, else from the only partner sharing a name word (ignoring `FIN_BANKFILE_EXCEPTION` words and those of three letters or fewer); with several, closest-name selection fails and leaves it blank, so `Add Transaction` opens with none (`AddTransactionFilterExpression`).
    - **Done by:** `FIN_BankStatementImport`.
-   - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE`, partners in `C_BPARTNER` and excluded words in `FIN_BANKFILE_EXCEPTION`; writes partner and GL item on the new lines.
-   - **User sees:** nothing; the final message counts only lines inserted (`RowsInserted`), and the prepared note on dropped zero-amount lines (`APRM_ZeroAmountNotInserted`) is never shown.
+   - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE`, partners in `C_BPARTNER` and excluded words in `FIN_BANKFILE_EXCEPTION`; writes partner and GL item on new lines.
+   - **User sees:** nothing; the final message counts only inserted lines (`RowsInserted`), dropping the prepared zero-amount note (`APRM_ZeroAmountNotInserted`).
 4. **Process the statement at once.**
-   - **What happens:** The import processes (confirms) the statement at once so matching can use it. A line dated on or before the latest line of earlier processed statements (or, if none, the last reconciliation's end date) leaves it unprocessed (`FIN_BankStatementProcess`) until the user corrects the dates or force-processes it (Section 2).
+   - **What happens:** The import processes the statement at once for matching (`FIN_AddPayment`). A line dated on or before the latest line of earlier processed statements (or, if none, the last reconciliation's end date) leaves it unprocessed until dates are corrected (`FIN_BankStatementProcess`). Force-processing is offered only if a line here is matched or the account has a line dated after this statement's last (`APRM_ISRECONCILED`), so it may be unavailable (Section 2.1, row 14).
    - **Done by:** `FIN_AddPayment`, which runs `FIN_BankStatementProcess`.
    - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE` and the last completed reconciliation in `FIN_RECONCILIATION`; writes the processed flag on `FIN_BANKSTATEMENT`.
-   - **User sees:** the statement number and lines inserted (`APRM_BankStatementNo`), or the date warning with the cut-off date and affected lines (`APRM_BankStatementLineWrongDateWarning`, `APRM_BankStatementLineWrongDateWarning2`).
+   - **User sees:** the statement number and lines inserted (`APRM_BankStatementNo`), or the date warning naming the cut-off date and lines (`APRM_BankStatementLineWrongDateWarning`, `APRM_BankStatementLineWrongDateWarning2`).
 
 **Figure 2. Matching in the Match Statement Screen**
 
 ```mermaid
 flowchart TD
-    A["User clicks Match Statement (Match Statement)"] --> B{"Run the matching rules now? (APRM_AlgorithmConfirm)"}
-    B -->|Yes or No| C["Draft reconciliation reused or created (FIN_RECONCILIATION)"]
-    C -->|Yes, nothing unmatched| D["Message: nothing to match (APRM_NoStatementsToMatch)"]
-    C -->|Yes| E["Unmatched lines matched, each saved at once (StandardMatchingAlgorithm)"]
-    C -->|No| F["Grid of statement lines (Match Statement P&E)"]
+    accTitle: Figure 2. Matching in the Match Statement Screen
+    accDescr: The top answer decides automatic matching; the loop is per-line work.
+    A["User opens the matching screen (Match Statement)"] --> B{"Run the matching rules? (APRM_AlgorithmConfirm)"}
+    B -->|Yes or No| C["Draft reused or created (FIN_RECONCILIATION)"]
+    C -->|Yes, nothing unmatched| D["Nothing to match (APRM_NoStatementsToMatch)"]
+    C -->|Yes| E["Lines matched, each saved at once (StandardMatchingAlgorithm)"]
+    C -->|No| F["List of statement lines (Match Statement P&E)"]
     D --> F
     E --> F
     F --> G["User resolves a line: search, add or unmatch (APRM_MatchingUtility)"]
     G --> F
     F --> H{"Which button?"}
     H -->|OK| I["Screen closes, draft stays open (MatchStatementActionHandler)"]
-    H -->|Reconcile All| J["On to completion and posting (MatchStatementActionHandler)"]
+    H -->|Reconcile All| J["On to completion (MatchStatementActionHandler)"]
 ```
 
-**How to read this:** The user's answer at the top decides whether automatic matching runs before the list of lines appears; the loop below is line-by-line work until a button is pressed.
+**How to read this:** The top answer decides automatic matching; the loop is per-line work.
 
 5. **Open Match Statement and answer the prompt.**
-   - **What happens:** The user clicks `Match Statement` (`EM_APRM_MATCHTRANSACTIONS`), opening a process definition (Pick and Execute: a pop-up grid, or on-screen table, where the user selects rows and runs an action). Before any data loads, a prompt (a yes-or-no question) asks, at every opening, whether to run the matching rules.
+   - **What happens:** The user clicks `Match Statement` (`EM_APRM_MATCHTRANSACTIONS`), opening a process definition (Pick and Execute: a pop-up grid where the user selects rows and runs an action); a grid is an on-screen table. At every opening, before data loads, a prompt (a yes-or-no question) asks whether to run the matching rules (`APRM_AlgorithmConfirm`).
    - **Done by:** the `Match Statement` process definition and its browser code, `modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`.
-   - **Tables:** reads the user's saved preference (a saved system setting) in `AD_PREFERENCE`.
-   - **User sees:** the prompt `APRM_AlgorithmConfirm`, warning that the run may create transactions, and a notice that every grid change is saved at once (`APRM_GRID_PERSIST_MESSAGE`) unless that preference hides it (`APRM_NoPersistInfoMessageInMatching`); with no Cancel or close button, only the screen's own buttons leave it.
+   - **Tables:** reads the user's preference (a saved system setting) in `AD_PREFERENCE`.
+   - **User sees:** the prompt, warning that the run may create transactions, and a notice that every grid change is saved at once (`APRM_GRID_PERSIST_MESSAGE`) unless that preference hides it (Section 3.2); the screen has no Cancel or close button.
 6. **Prepare the draft reconciliation.**
-   - **What happens:** Whatever the answer, the system reuses the account's draft (unfinished) reconciliation or creates one (`APRM_MatchingUtility`). A reused draft is re-dated, first repairing any transaction shown as cleared (linked) with no statement line, the trace of mixed manual and statement reconciliation (Section 4.4); a new draft is numbered from its document type, dated at the latest processed line and opened at the last reconciliation's balance.
+   - **What happens:** Whatever the answer, the account's draft (unfinished) reconciliation is reused or created (`APRM_MatchingUtility`). A reused draft is re-dated after repairing any transaction shown as cleared (linked) without a statement line, a trace of mixed manual and statement reconciliation (Section 4.4); a new draft is numbered, dated at the latest processed line and opened at the last reconciliation's balance.
    - **Done by:** `MatchStatementOnLoadActionHandler`, using `APRM_MatchingUtility`.
-   - **Tables:** reads `FIN_BANKSTATEMENTLINE`, `C_DOCTYPE` and earlier reconciliations in `FIN_RECONCILIATION`; writes the draft in `FIN_RECONCILIATION` and any repaired transaction in `FIN_FINACC_TRANSACTION`.
+   - **Tables:** reads `FIN_BANKSTATEMENTLINE`, `C_DOCTYPE` and `FIN_RECONCILIATION`; writes the draft there, any repaired transaction in `FIN_FINACC_TRANSACTION` and its payment's status (stage, such as cleared) in `FIN_PAYMENT`.
    - **User sees:** nothing, unless `APRM_NoDocTypeRec` (no reconciliation numbering) or `APRM_ReconciliationMixed` (repair failed) stops it.
 7. **Run automatic matching, if accepted.**
-   - **What happens:** If no processed statement line is unmatched, the system only says so. Otherwise it takes each unmatched line in date order (for an earlier draft, only lines up to its end date, Section 1.3), asks the account's rules for one transaction and saves each match at once. A matched transaction becomes cleared (`RPPC`) and joins the draft; a line the rules cannot evaluate stays unmatched (Section 4.1).
-   - **Done by:** `MatchStatementOnLoadActionHandler`, applying the rules the account's record names (shipped as `StandardMatchingAlgorithm`, through `FIN_MatchingAlgorithm`; Section 3.1).
-   - **Tables:** reads `FIN_MATCHING_ALGORITHM`, `FIN_BANKSTATEMENTLINE` and candidate transactions (ones that could settle the line) in `FIN_FINACC_TRANSACTION`, with `FIN_PAYMENT` and `C_BPARTNER` details; writes the link and match level (the code recording how a line was matched, `MATCHINGTYPE`) on the line, and cleared status and draft link on `FIN_FINACC_TRANSACTION` and `FIN_PAYMENT`.
-   - **User sees:** the match count (`APRM_AutomaticMatchedLines`), `APRM_NoAutomaticMatchedLines` or `APRM_NoStatementsToMatch`, then the grid.
+   - **What happens:** With no processed line unmatched, the system only says so (`APRM_NoStatementsToMatch`). Otherwise it takes each unmatched line in date order (an earlier draft only up to its end date, Section 1.3), asks the account's rules for one transaction and saves each match at once. A matched transaction becomes cleared (`RPPC`) and joins the draft; a line the rules cannot evaluate stays unmatched (Section 4.1).
+   - **Done by:** `MatchStatementOnLoadActionHandler`, applying the account's rules (shipped as `StandardMatchingAlgorithm`, through `FIN_MatchingAlgorithm`; Section 3.1).
+   - **Tables:** reads `FIN_MATCHING_ALGORITHM`, `FIN_BANKSTATEMENTLINE` and candidates (transactions that could settle the line) in `FIN_FINACC_TRANSACTION`, with `FIN_PAYMENT` and `C_BPARTNER` details; writes the link and match level (the code recording how a line was matched, `MATCHINGTYPE`) on the line, cleared status and draft link on `FIN_FINACC_TRANSACTION`, and cleared status alone on any linked `FIN_PAYMENT`.
+   - **User sees:** the match count (`APRM_AutomaticMatchedLines`) or `APRM_NoAutomaticMatchedLines`, then the grid.
 8. **Review the grid.**
-   - **What happens:** The grid lists the account's processed statement lines still unmatched, including those left from earlier statements, plus those matched in the current draft, in date order; lines cleared in earlier reconciliations do not appear (`MatchStatementTransformer`).
-   - **Done by:** the `Match Statement P&E` window, an HQL-based table (a read-only list built from a database query, `aprm_matchstatement`) filtered by `MatchStatementTransformer`.
+   - **What happens:** The grid lists, in date order, the account's unmatched processed lines, including those from earlier statements, plus those matched in the current draft; lines cleared in earlier reconciliations are hidden (`MatchStatementTransformer`).
+   - **Done by:** the `Match Statement P&E` window, which uses the `aprm_matchstatement` HQL-based table (a read-only list built from a database query, a request for stored records), with rows chosen by `MatchStatementTransformer`.
    - **Tables:** reads `FIN_BANKSTATEMENT`, `FIN_BANKSTATEMENTLINE`, `FIN_FINACC_TRANSACTION`, `C_BPARTNER` and `C_GLITEM`; writes nothing.
-   - **User sees:** each line's date, partner, reference, amount and match strength (Section 3.1), and the linked transaction's date, partner, amount and GL item. Search and add work only while a row is unmatched, unmatch only once it is matched.
+   - **User sees:** each line's date, partner, reference (the bank's identifier, not an ERP document number), amount and match strength (Section 3.1), and the linked transaction's date, partner, amount and GL item. Search and add work only on unmatched rows, unmatch only on matched ones (`modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`).
 9. **Resolve the remaining lines.**
-   - **What happens:** For each line still unmatched, the user searches for and links one or more transactions, splitting the line when amounts differ, or adds a missing transaction, created and linked at once; unmatch undoes a wrong link. Each row action first checks that no one changed the line since the grid loaded (`CheckRecordChangedActionHandler`). Actions are in Section 2, side effects in Section 4.2.
-   - **Done by:** `FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler` and the unmatch actions (`UnMatchSelectedTransactionsActionHandler`), all through `APRM_MatchingUtility`.
+   - **What happens:** For each unmatched line, the user searches for and links one or more transactions, splitting the line when amounts differ, or adds a missing one, created and linked at once; unmatch undoes a wrong link (`APRM_MatchingUtility`). Section 2 lists the actions, Section 4.2 their side effects and Section 4.4 the stale-line check (`CheckRecordChangedActionHandler`).
+   - **Done by:** `FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler` and `UnMatchSelectedTransactionsActionHandler`, all through `APRM_MatchingUtility`.
    - **Tables:** reads and writes `FIN_BANKSTATEMENTLINE` (a split adds a line for the remainder), `FIN_FINACC_TRANSACTION` and `FIN_PAYMENT`.
-   - **User sees:** a pop-up grid of candidates or an entry form, then the refreshed grid, or `APRM_StaleDate` if the line changed meanwhile.
+   - **User sees:** a pop-up grid of candidates or an entry form, then the refreshed grid, or `APRM_StaleDate` if the line changed.
 
 **Figure 3. Completing and Posting the Reconciliation**
 
 ```mermaid
 flowchart TD
+    accTitle: Figure 3. Completing and Posting the Reconciliation
+    accDescr: The first diamond can refuse completion; the second shows what starts posting.
     A["User presses Reconcile All (MatchStatementActionHandler)"] --> B["Draft re-dated, balances recalculated (MatchTransactionDao)"]
-    B --> C{"Every cleared item in an open period?"}
-    C -->|No| D["Closed-period error, draft stays open (APRM_PeriodNotAvailableClearedItem)"]
-    C -->|Yes| E["Completed; unmatched lines wait for the next one (FIN_ReconciliationProcess)"]
+    B --> C{"Accounting applies and a cleared item's period is closed?"}
+    C -->|Yes| D["Closed-period error, draft stays open (APRM_PeriodNotAvailableClearedItem)"]
+    C -->|No| E["Completed; unmatched lines carry forward (FIN_ReconciliationProcess)"]
     E --> F{"Who starts posting?"}
     F -->|A user| G["User clicks Post (Posted)"]
-    F -->|A schedule| H["Background accounting job runs (AcctServerProcess)"]
+    F -->|A schedule| H["Background job runs (AcctServerProcess)"]
     G --> I{"Any cleared item needing entries? (DocFINReconciliation)"}
     H --> I
-    I -->|No| J["No entries; button shows Document Disabled (DocFINReconciliation)"]
-    I -->|Yes| K["Entries written to the general ledger (FACT_ACCT)"]
+    I -->|No| J["No entries; button shows Document Disabled"]
+    I -->|Yes| K["Ledger entries written (FACT_ACCT)"]
 ```
 
-**How to read this:** From Reconcile All, the first diamond can refuse completion and the second shows posting started by a user or a schedule.
+**How to read this:** The first diamond can refuse completion; the second shows what starts posting.
 
 10. **Save and leave, or press Reconcile All.**
-    - **What happens:** OK closes the screen, leaving the draft open with every match saved. `Reconcile All` re-dates the draft to the latest processed line (for an earlier draft, its latest cleared line), recalculates its balances and asks for completion.
+    - **What happens:** OK closes the screen, leaving the draft open, every match saved (`MatchStatementActionHandler`). `Reconcile All` re-dates the draft to the latest processed line (for an earlier draft, its latest cleared line), recalculates balances and asks for completion.
     - **Done by:** `MatchStatementActionHandler`, using `APRM_MatchingUtility` and `MatchTransactionDao`.
     - **Tables:** reads `FIN_BANKSTATEMENTLINE` and `FIN_FINACC_TRANSACTION`; writes dates and balances on `FIN_RECONCILIATION`.
-    - **User sees:** the `Financial Account` window, with a success message or the error that stopped completion.
+    - **User sees:** the `Financial Account` window, showing success or the error that stopped completion.
 11. **Complete the reconciliation.**
-    - **What happens:** For organizations set up for accounting, each cleared transaction's accounting date must fall in an open accounting period (a span open for bookings); if one does not, nothing is completed (`FIN_ReconciliationProcess`). Otherwise this and any later reconciliation get recalculated balances, and it is marked complete even with lines still unmatched. Balances add every processed line, matched or not, so the document shows the bank's balance while unmatched lines wait for the next reconciliation (Section 4.2).
+    - **What happens:** For organizations set up for accounting, each cleared transaction's accounting date must fall in an open accounting period (a span open for bookings), or nothing is completed; otherwise it and later reconciliations get recalculated balances, and it completes even with lines unmatched (`FIN_ReconciliationProcess`). Balances count every processed line, matched or not, so the document shows the bank's balance while unmatched lines carry forward (Section 4.2).
     - **Done by:** `FIN_ReconciliationProcess`, with balances from `MatchTransactionDao`.
     - **Tables:** reads the cleared items in `FIN_RECONCILIATIONLINE_V`, their transactions in `FIN_FINACC_TRANSACTION` and the open periods in `C_PERIODCONTROL`; writes status and balances on `FIN_RECONCILIATION`.
-    - **User sees:** success, or `APRM_PeriodNotAvailableClearedItem` naming the item in a closed period; the completed reconciliation then shows in the `Reconciliations` tab, its items in `Cleared items`.
+    - **User sees:** success, or `APRM_PeriodNotAvailableClearedItem` naming the item in a closed period; the completed reconciliation shows in the `Reconciliations` tab (a section of a window), its items in `Cleared items`.
 12. **Post the reconciliation.**
-    - **What happens:** Posting books only cleared transactions for which the account's accounting setup, and for payments the payment method (a way of paying, such as a bank transfer), names a ledger account for clearing, so a reconciliation with none gets no entries; a closed period also refuses it (`DocFINReconciliation`).
-    - **Done by:** the `Posted` button on the `Reconciliations` tab, shown once complete, or `Acct Server Process`, a background process (a job the system runs on a schedule without a user) run by `AcctServerProcess`; both use `DocFINReconciliation`.
+    - **What happens:** Posting books only cleared transactions for which the account's accounting setup, and for payments the payment method (a way of paying, such as a bank transfer), names an account in the company's books for cleared items, so a reconciliation with none gets no entries; a closed period also refuses it (`DocFINReconciliation`).
+    - **Done by:** the `Posted` button on the `Reconciliations` tab once complete, or `Acct Server Process`, a background process (a job the system runs on a schedule without a user) run by `AcctServerProcess`; both use `DocFINReconciliation`.
     - **Tables:** reads `FIN_FINACC_TRANSACTION`, `FIN_FINACC_PAYMENTMETHOD` and `FIN_FINANCIAL_ACCOUNT_ACCT`; writes entries to `FACT_ACCT` and the posting status on `FIN_RECONCILIATION`.
-    - **User sees:** the new entries in the General Ledger Journal report (`ReportGeneralLedgerJournal`), or a button caption giving the outcome, such as `Post: Document Disabled` or `Post: Period Closed`. Once posted, the button reads `Unpost`, which deletes the entries (`ResetAccounting`).
+    - **User sees:** the entries in the General Ledger Journal report (`ReportGeneralLedgerJournal`), or a button caption such as `Post: Document Disabled` or `Post: Period Closed`; once posted it reads `Unpost`, which deletes the accounting entries (`ResetAccounting`).
     - **Unconfirmed:** whether posting a reconciliation produces entries, because that depends on how each payment method books cleared items and on the configured accounts (consulted `DocFINReconciliation`, `DocFINBankStatement`).
     - **Unconfirmed:** whether and how often posting runs on a schedule, because core product data sets no schedule and only the QA (test) sample data runs it every five minutes, so each installation sets its own (consulted `AcctServerProcess`, `src-db/database/sourcedata/referencedData/AD_PROCESS_REQUEST.xml`, `referencedata/sampledata/QA_Testing/AD_PROCESS_REQUEST.xml`).
 
 ### 1.3 Accounts and Periods Outside the Main Path
 
-- **Accounts reconciled without a bank file:** a cash account, or a bank account with no matching algorithm record, shows the `Reconcile` button (`EM_APRM_RECONCILE`) instead. It opens the older `Reconciliation` screen, where the user ticks transactions as cleared without linking statement lines, so a workbench tracking unmatched lines would miss these accounts (rows 29 and 30 in Section 2.1; mixing ban in Section 4.4).
-- **Reopening an earlier period:** after an earlier reconciliation is force-reopened (Section 2), the account shows `Match Transactions Force` instead of `Match Statement`, working only on lines up to that reconciliation's end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
+- **Accounts reconciled without a bank file:** only bank-type accounts with a record in `FIN_MATCHING_ALGORITHM_ID` show `Import Statement` and `Match Statement`; cash accounts, and bank accounts without one, show `Reconcile` (`EM_APRM_RECONCILE`), opening the older `Reconciliation` screen, where the user ticks transactions as cleared without linking statement lines. A workbench tracking unmatched lines would miss these accounts (Section 2.1, rows 29 and 30; mixing ban, Section 4.4).
+- **Reopening an earlier period:** once an earlier reconciliation is force-reopened (Section 2.1, row 34), `Match Transactions Force` replaces `Match Statement`, working only on lines up to its end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
 
-**Requirement implications:** A workbench must start from processed statements' lines on each bank account, act on the draft reconciliation `Match Statement` uses, and expect completed reconciliations to leave lines unmatched; accounts reconciled without a bank file need their own treatment (Section 1.3).
+**Requirement implications:** A workbench must start from processed statement lines per bank account, act on the draft `Match Statement` uses, and expect completed reconciliations to leave lines unmatched; accounts reconciled without a bank file need separate treatment (Section 1.3).
 
 ## 2. Manual User Actions and Their Triggers
 
@@ -161,7 +165,7 @@ flowchart TD
 
 ### 2.1 Every Manual Action and What Drives It
 
-Frequency driver is the event that brings an action back; Data volume sensitivity is High per line or transaction, Medium per statement, session or period, Low for rare corrections and None for one-time setup; real volumes are not determinable from code (Section 7). Could be automated is Yes when code already does or can skip the step, Partly when it does part, No when a person must judge.
+Frequency driver is the event that brings an action back; Data volume sensitivity (how work grows with volume) is High per line or transaction, Medium per statement, session or period, Low for rare corrections and None for one-time setup; real volumes are not determinable from code (Section 7). Could be automated is Yes when code already does or can skip the step, Partly when it does part, No when a person must judge.
 
 **Assumption:** users holding the standard Finance role (a named set of screen and process permissions), shown as Finance, perform every row except 1 (System Administrator), 2, 4 and 5 (windows this role may only view in `AD_WINDOW_ACCESS`), and 9 and 10 (windows no standard role is granted). **Unconfirmed:** which people hold that role, because role assignments are installation data (consulted `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml`, `AD_USER_ROLES`).
 
@@ -180,7 +184,7 @@ Frequency driver is the event that brings an action back; Data volume sensitivit
 | 11. Import the bank file | Finance | Statement received from the bank | `Financial Account` (`EM_APRM_IMPORTBANKFILE`), `ImportBankFile` | Per statement | Medium: one upload per file | Partly: reading and processing run alone after upload (`FIN_BankStatementImport`); no code fetches files |
 | 12. Enter or correct a statement and its lines by hand | Finance | No file, or file rejected (`APRM_InvalidOrMissingValues`) | `Imported Bank Statements`, `Bank Statement Lines` | Per statement without a usable file | High: per line | Partly: a format module reads files instead (row 1) |
 | 13. Process a hand-entered statement | Finance | Statement complete | `EM_APRM_PROCESS_BS`, `FIN_BankStatementProcess` | Per hand-entered statement | Medium: per statement | Yes: import already processes what it creates (`FIN_BankStatementImport`) |
-| 14. Force-process a statement despite earlier dates | Finance | Date warning (`APRM_BankStatementLineWrongDateWarning`) | `EM_APRM_PROCESS_BS_FORCE`, `FIN_BankStatementProcess` | Per warned statement | Medium: per statement | Partly: a fixed date rule only a person overrides (Section 4.4) |
+| 14. Force-process a statement despite earlier dates | Finance | Date warning (`APRM_BankStatementLineWrongDateWarning`) with a matched line or later-dated account line (`APRM_ISRECONCILED`) | `EM_APRM_PROCESS_BS_FORCE`, `FIN_BankStatementProcess` | Per warned statement | Medium: per statement | Partly: a fixed date rule only a person overrides (Section 4.4) |
 | 15. Open Match Statement | Finance | Statement processed; shown for bank accounts with a record and no older draft | `Financial Account` (`EM_APRM_MATCHTRANSACTIONS`), `Match Statement` | Per opening of Match Statement | Medium: per session | Partly: draft handling and matching are programs only this screen starts (`MatchStatementOnLoadActionHandler`) |
 | 16. Accept or decline the automatic matching run | Finance | Prompt at every opening (`APRM_AlgorithmConfirm`) | `Match Statement` | Per opening of Match Statement | Medium: per session | Yes: the prompt only gates a program needing no input (Section 3.3) |
 | 17. Dismiss the immediate-save notice for good | Finance | Notice at every opening until dismissed (`APRM_GRID_PERSIST_MESSAGE`) | `MatchStatementOnLoadPreferenceActionHandler` (`APRM_NoPersistInfoMessageInMatching`) | Once per user | None: once per person | No: a personal choice |
@@ -272,7 +276,7 @@ flowchart TB
   M12 --> S2
   S2 -->|"earlier dates"| S3
   S3 -->|"fix dates"| M12
-  S3 -->|"override"| M14
+  S3 -->|"if offered"| M14
   S2 -->|"processed"| M15
   M14 --> M15
   M15 -->|"notice"| M17
@@ -499,7 +503,7 @@ No type records an owner (Section 4.3): "Finance, assumed" names Section 2's ass
 | Carried-forward line | Reconcile completes with it unmatched (Section 4.2, `FIN_ReconciliationProcess`) | As a line left unmatched, later or never | Finance, assumed | Age derivable (`DATETRX`) but unmarked, no reason; with no due date (Section 4.3), nothing bounds cycle time |
 | Line changed by someone else | `APRM_StaleDate`: search and add check only before their pop-up opens (`CheckRecordChangedActionHandler`), unmatch on submission (`UnMatchTransactionActionHandler`), so a change during an open pop-up goes uncaught | Refresh and retry | Finance, assumed; lines unassigned | Neither: colleagues learn of each other by refusal, if at all |
 | Cleared item in a closed accounting period | Reconcile and reactivation stop, naming the item, if its accounting date (`DATEACCT`) is in a period not open (`C_PERIODCONTROL`, `APRM_PeriodNotAvailableClearedItem`) for organizations with accounting (`FIN_ReconciliationProcess`); manual checks differ (Appendix C) | Draft: unmatch the item or reopen the period (Open/Close Period Control window); completed: reactivate only after reopening | Not determinable from code: no standard role holds the period window | Neither: the unstored block hides the wait in cycle time |
-| Statement dates out of order | Statement left unprocessed, failing lines listed (Section 1.2, `APRM_BankStatementLineWrongDateWarning`) | Correct the dates and reprocess, or force-process (Section 2) | Finance, assumed | Age derivable (`IMPORTDATE`), no reason; lines are in no unmatched list (Section 4.1), and the one age rule is inactive (Section 4.3) |
+| Statement dates out of order | Statement left unprocessed, failing lines listed (Section 1.2, `APRM_BankStatementLineWrongDateWarning`) | Correct dates and reprocess, or force-process where offered (Section 1.2, step 4) | Finance, assumed | Age derivable (`IMPORTDATE`), no reason; lines are in no unmatched list (Section 4.1), and the one age rule is inactive (Section 4.3) |
 | Manual and statement reconciliation mixed | Match Statement clears a draft's hand ticks, telling only the server log (a technical record users do not see), or fails (`APRM_ReconciliationMixed`, `APRM_MatchingUtility`); manual reconciliation refuses a draft with statement lines (`Reconciliation`) | Finish the draft in one mode | Finance, assumed | Neither: hand work is reversed unannounced |
 | Split after posting | Blocked once the reconciliation is posted (Section 4.2) | Link an exact amount, or unpost first (`ResetAccounting`) | Finance, assumed | Neither: the line waits unexplained |
 | Reactivation limits | Processed statements, lines and reconciliations refuse key-field edits, insertion and deletion (`20501`); reopening is refused if posted, if a statement has a matched line (`APRM_BSLineReconciled`), or if a later reconciliation (`APRM_FutureReconciliationExists`) or another draft exists (`APRM_DraftReconciliationExists`) | Reopen first: force-reactivation skips only the matched-line or later-reconciliation check; else unpost, finish the draft or delete later reconciliations (Section 2) | Finance, assumed | Neither: correcting a completed period is a chain of unassigned steps |
@@ -614,24 +618,27 @@ Each technical term as defined at its first use.
 |------|------------------|
 | Accounting period | a span open for bookings |
 | Affinity column | the grid's match-strength code |
-| Age | how long an unmatched item has been open |
+| Age (of an unmatched item) | how long it has been open |
 | Alert | a system-generated to-do message sent to a user or role |
 | Auto-match rate | the share of statement lines matched with no person acting |
 | Background process | a job the system runs on a schedule without a user |
 | Bank file format | one bank's file layout |
 | Bank statement line | one entry on the statement the bank sends |
 | Business partner | a customer or supplier |
-| Candidate | a transaction that could settle the line |
+| Candidates | transactions that could settle the line |
 | Class | a program unit |
-| Cleared | linked, said of a transaction |
+| Cleared | linked |
 | Cycle time | the time from statement import to completed reconciliation |
-| Data table | a store of records |
+| Data tables | stores of records |
+| Data volume sensitivity | how work grows with volume |
+| Database query | a request for stored records |
 | Dataset | packaged setup data |
 | Document type | the setting that numbers a kind of document |
-| Draft | an unfinished reconciliation |
+| Draft | unfinished |
 | ERP | business-management software |
-| Exception | an unmatched line |
+| Exceptions | unmatched lines |
 | Financial account | the ERP record for one bank account |
+| Frequency driver | the event that brings an action back |
 | General ledger | the company's books |
 | GL item | a general-ledger category for amounts with no invoice, such as bank fees |
 | Grid | an on-screen table |
@@ -642,26 +649,29 @@ Each technical term as defined at its first use.
 | Matching | linking a statement line to the transaction it settles |
 | Matching algorithm record | a saved set of matching rules that one or more financial accounts use |
 | Module | a separately packaged part of the ERP |
-| Owner | the person accountable for resolving an unmatched item |
-| Pass | a round of checks |
+| Owner (of an unmatched item) | the person accountable for resolving it |
+| Passes | rounds of checks |
 | Payment method | a way of paying, such as a bank transfer |
 | Posting | creating the accounting entries in the general ledger |
 | Preference | a saved system setting |
-| Process (a statement) | confirm it |
 | Process definition (Pick and Execute) | a pop-up grid where the user selects rows and runs an action |
+| Processed (a statement) | confirmed |
 | Prompt | a yes-or-no question |
 | QA | test |
 | Reactivate | reopen for editing |
-| Reason code | a record of why an unmatched item is unresolved |
+| Reason code (of an unmatched item) | a record of why it is unresolved |
 | Reconciliation | the period document confirming the ERP balance agrees with the bank |
 | Record notes | free-text comments attachable to any record |
+| Reference | the bank's identifier, not an ERP document number |
 | Role | a named set of screen and process permissions |
 | Server log | a technical record users do not see |
+| Status | stage, such as cleared |
 | Strong match | a candidate found by the algorithm's primary rules |
-| Swimlane | a diagram with one lane per actor |
-| Tolerance | an allowed difference |
+| Swimlanes | diagrams with one lane per actor |
+| Tab | a section of a window |
+| Tolerance | allowed difference |
 | Transaction | the ERP's record of money expected in or out of a financial account |
-| Unpost | delete the accounting entries of a posted document |
+| Unpost | deletes the accounting entries |
 | Weak match | a candidate found only by its looser fallback rules |
 | Window | a data-entry screen |
 

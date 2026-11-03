@@ -3,72 +3,72 @@
 ## Key Takeaways
 
 - Mirror `Match Statement`, `Alert Management` and `Financial Account`, not hand-coded pages.
-- Permissions, alerts and schedules (`AD_ROLE`, `AD_ALERT`, `OBScheduler`) are reusable, but none sets owners.
-- Bank lines in `FIN_BANKSTATEMENTLINE` need owner, reason code and status fields; age needs none.
-- Import, matching and reconciliation completion have no automated tests (`MatchTransactionDao`).
-- Phase 1 adds exception fields; a worklist like `aprm_matchstatement` and alerts come next.
+- Permissions, to-do messages and schedules (`AD_ROLE`, `AD_ALERT`, `OBScheduler`) are reusable; none assigns work.
+- Bank lines (`FIN_BANKSTATEMENTLINE`) need assignee, cause and status fields; waiting time needs none.
+- Importing statements, linking lines and period sign-off have no automated tests (`MatchTransactionDao`).
+- First add those fields, then to-do messages and a worklist modelled on `aprm_matchstatement`.
 
 ## 1. UI Framework and Patterns to Follow
 
-**What this section tells you:** The workbench can be built mostly from screen patterns the system generates from stored settings, so filtering, permissions and notes need no custom code. Three existing screens already do most of the job, and Figure 1 sketches a proposed screen built from them.
+**What this section tells you:** Much of the workbench can be generated from stored settings, so filtering, permissions and notes need no custom code. Three existing screens do most of the job; Figure 1 sketches a proposed screen combining them.
 
-In this ERP (enterprise resource planning, the business software that keeps the company's accounts), a financial account (`FIN_FINANCIAL_ACCOUNT`) is the ERP record for one bank account, and a transaction (`FIN_FINACC_TRANSACTION`) is the ERP's record of money expected in or out of a financial account. A bank statement line (`FIN_BANKSTATEMENTLINE`) is one entry on the statement the bank sends, and matching is linking a statement line to the transaction it settles. A reconciliation (`FIN_RECONCILIATION`) is the period document confirming the ERP balance agrees with the bank; an owner is the person accountable for clearing an unmatched item, and a reason code records why it is unmatched.
+In this ERP (enterprise resource planning, business-management software), a financial account (`FIN_FINANCIAL_ACCOUNT`) is the ERP record for one bank account, and a transaction (`FIN_FINACC_TRANSACTION`) is the ERP's record of money expected in or out of a financial account. A bank statement line (`FIN_BANKSTATEMENTLINE`) is one entry on the statement the bank sends, and matching is linking a statement line to the transaction it settles. A reconciliation (`FIN_RECONCILIATION`) is the period document confirming the ERP balance agrees with the bank; an owner is the person accountable for clearing an unmatched item, age is how long an unmatched item has been open, and a reason code is a record of why an item is unmatched.
 
-The workbench serves one objective: "reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." Cycle time is the time from statement import to completed reconciliation.
+The workbench's objective is: "reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." Cycle time is the time from statement import to completed reconciliation.
 
 ### 1.1 Technology Baseline
 
-- **Server:** Java (the server's programming language), version 11 or later as `build.xml` enforces, built with Apache Ant (a build tool) 1.9.2 or later.
-- **Screens:** JavaScript (the browser's programming language) on Isomorphic SmartClient (a library of browser grids, meaning spreadsheet-like lists of records, and forms), release v10.0d, bundled in `modules/org.openbravo.userinterface.smartclient`. Each screen is described in the Application Dictionary (the metadata that defines screens, tables and processes: stored records, not code), for example `AD_WINDOW`, `AD_TAB`, `AD_FIELD` and `OBUIAPP_PROCESS`.
-- **Data:** PostgreSQL (the database), with each table's structure kept as XML (structured text) under `src-db/database/model` and in each module's (a separately packaged part of the ERP) database folder.
-- **Java tests:** JUnit 4.13.2 (a Java test framework) and Mockito 4.11.0 (a tool that fakes other program parts in tests), both in `lib/test`, with tests in `src-test/src` and in module folders such as `modules/org.openbravo.client.application/src-test`.
-- **Test runs:** `src-test/build.xml` runs two test suites (named bundles of tests), `StandaloneTestSuite` through `run.all.tests` and `WebserviceTestSuite` through `run.webservice.tests`, while `run.test` runs any single test, including those in neither suite.
+- **Server (the computer running the ERP):** Java (the server's programming language) 11 or later, as `build.xml` enforces, built with Apache Ant (a build tool) 1.9.2 or later.
+- **Screens:** JavaScript (the browser's programming language) on Isomorphic SmartClient (a library of browser grids, each a spreadsheet-like list of records, and forms) v10.0d, in `modules/org.openbravo.userinterface.smartclient`. Windows and process pop-ups are generated from the Application Dictionary (the metadata that defines screens, tables and processes: stored records, not code), for example `AD_WINDOW`, `AD_TAB`, `AD_FIELD` and `OBUIAPP_PROCESS`.
+- **Data:** PostgreSQL (the database), with table structures kept as XML (structured text) under `src-db/database/model` and each module's (a separately packaged part of the ERP) database folder.
+- **Java tests:** JUnit 4.13.2 (a Java test framework) and Mockito 4.11.0 (a tool that fakes other program parts in tests), both in `lib/test`, with tests in `src-test/src` and module folders such as `modules/org.openbravo.client.application/src-test`.
+- **Test runs:** `src-test/build.xml` runs two test suites (each a named bundle of tests), `StandaloneTestSuite` through `run.all.tests` and `WebserviceTestSuite` through `run.webservice.tests`, while `run.test` runs any single test, suite or not.
 - **User-interface tests:** Jest 29.7 (a JavaScript test runner), declared in `package.json`, runs three utility test files in `modules/org.openbravo.client.application/web-test`.
 
 ### 1.2 Patterns for Windows, Views and Dashboards
 
-Every pattern below is stored as Application Dictionary records that the server turns into a browser screen when a user opens it (`StandardWindowComponent`, `ParameterWindowComponent`), so a workbench built this way is mostly records and server actions, quicker to build and consistent with `Financial Account`. Appendix B lists the records behind each pattern.
+The first two patterns are generated from Application Dictionary records (`StandardWindowComponent`, `ParameterWindowComponent`), so a workbench built mainly from them is records and server actions, quicker to build and consistent with `Financial Account`. Appendix B lists each pattern's records.
 
 | Pattern | Workbench use | Example in the code | Limit for the workbench |
 |---------|---------------|---------------------|-------------------------|
-| Standard window (a data-entry screen with a header and sub-tabs) defined in the Application Dictionary | Exception records with their owner, reason and status | `Financial Account` window | Each tab shows one table beneath its parent (`AD_TAB`), so it suits editing one exception, not a list joining lines, accounts and transactions |
-| Process definition, Pick and Execute (a pop-up grid where the user selects rows and runs an action) | Bulk assign, set reason, resolve | `Match Statement` (`OBUIAPP_PickAndExecute`), built on `BaseProcessActionHandler` | It sits over the window that opened it, for one task; `Match Statement` hides its Cancel and Close buttons to keep users in it (`modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`), a workaround to avoid |
-| HQL-based table (a read-only list built from a database query, a saved request that selects records) | One worklist across all financial accounts, showing age | `aprm_matchstatement`, the Match Statement grid | Being read-only (`HQLDataSourceService`), each change needs its own server action |
-| Manual view (a custom-built screen registered in the Application Dictionary) | Only if a bespoke layout is needed | `OBUIAPP_AlertManagement` | Hand-written JavaScript (`modules/org.openbravo.client.application/web/org.openbravo.client.application/js/alert-management/ob-alert-management-view.js`), with only the features its code builds |
-| Workspace and Query/List widgets (small panels on the Workspace dashboard, the latter showing a query's result) | Counts by age, owner and reason | `OBKMO_WIDGET_CLASS`, `OBCQL_WIDGET_QUERY` | Display only (`QueryListDataSource`), though a column can total or open a window tab (`OBCQL_QUERY_COLUMN`), as in the shipped `Payment In - awaiting for execution` widget |
-| Classic servlet (an older, hand-coded web page) | Avoid for new work; see Analysis 1, Section 1.2 and Analysis 1, Section 2 | `ImportBankFile`, `Reconciliation` | Each page has a hand-written template (`XmlDocument`), so none of the behaviour below applies |
+| Standard window (a data-entry screen with a header and sub-tabs) | Exception records with owner, reason and status | `Financial Account` window | Each tab reads one registered table beneath its parent (`AD_TAB`), so Financial Account's sub-tabs show one account at a time; a cross-account worklist needs its own joined table, as `Cleared items` reads transactions joined to statement lines (`FIN_RECONCILIATIONLINE_V`) |
+| Process definition, Pick and Execute (a pop-up grid where the user selects rows and runs an action) | Bulk assign, set reason, resolve | `Match Statement` (`OBUIAPP_PickAndExecute`), built on `BaseProcessActionHandler` | It sits over its opening window, for one task; `Match Statement` hides Cancel and Close to keep users in it (`modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`), a workaround to avoid |
+| HQL-based table (a read-only list built from a database query, a saved request that selects records) | One worklist across all financial accounts, showing age | `aprm_matchstatement`, the Match Statement grid | Each change needs its own server action (`HQLDataSourceService`) |
+| Manual view (a custom-built screen registered in the Application Dictionary) | Only for a bespoke layout | `OBUIAPP_AlertManagement` | Hand-written JavaScript (`modules/org.openbravo.client.application/web/org.openbravo.client.application/js/alert-management/ob-alert-management-view.js`), with only the features its code builds |
+| Workspace and Query/List widgets (small panels on the Workspace dashboard, a summary start page; Query/List widgets show a query's result) | Counts by age, owner and reason | `OBKMO_WIDGET_CLASS`, `OBCQL_WIDGET_QUERY` | Display only (`QueryListDataSource`), though a column can total or open a window tab (`OBCQL_QUERY_COLUMN`), as in the shipped `Payment In - awaiting for execution` widget |
+| Classic servlet (an older, hand-coded web page) | Avoid for new work (Analysis 1, Section 1.2 and Analysis 1, Section 2) | `ImportBankFile`, `Reconciliation` | A hand-written page template, a layout file (`XmlDocument`), without the behaviour below |
 
-Screens defined in the Application Dictionary get filtering and grid behaviour from the shared grid `OBGrid`, and role-based access (a role is a named set of screen and process permissions) through `AD_WINDOW_ACCESS` and `OBUIAPP_PROCESS_ACCESS`, each pattern with its own grant (Appendix B), without custom code. Servlets built on `HttpSecureAppServlet` need every page written by hand, so they are slower to build and harder to keep consistent.
+Generated screens (`StandardWindowComponent`, `ParameterWindowComponent`) and HQL-based tables get the built-in behaviour below without custom code. Hand-written manual views and servlets (`HttpSecureAppServlet`) are slower to build and harder to keep consistent; widgets use their own components (`WidgetProvider`). Roles (a role is a named set of screen and process permissions) are granted each pattern separately (Appendix B).
 
 | Built-in behaviour | Where it comes from | What it gives the workbench |
 |--------------------|---------------------|-----------------------------|
-| Column filters and sorting | `OBGrid`, shared by window, pop-up and `OBUIAPP_AlertManagement` grids (`OBPickAndExecuteGrid`, `OBAlertGrid`) | Any worklist column, such as account or age, filters without new code |
-| Saved views (a user's stored columns and filters) and spreadsheet export | Standard windows (`OBUIAPP_UIPERSONALIZATION`, `OBUIAPP_ExportGrid`) | Owners keep views of their own items; supervisors export the list |
-| Notes, attachments and linked items, plus who created and last changed each record | Standard window forms (`OBViewFieldHandler`, `OBUIAPP_NOTE`, `OBAuditSectionItem`) | Free-text explanations, though a reason code still needs a field |
+| Column filters and sorting | `OBGrid`, shared by window, pop-up and `OBUIAPP_AlertManagement` grids (`OBPickAndExecuteGrid`, `OBAlertGrid`) | Any worklist column, such as account or age, filters |
+| Saved views (a user's stored columns and filters) and spreadsheet export | Standard windows (`OBUIAPP_UIPERSONALIZATION`, `OBUIAPP_ExportGrid`) | Owners keep views of their items; supervisors export the list |
+| Notes, attachments, linked items, and who created and last changed each record | Standard window forms (`OBViewFieldHandler`, `OBUIAPP_NOTE`, `OBAuditSectionItem`) | Free-text explanations, though a reason code needs a field |
 | Buttons and fields shown only when they apply | Per-field display rules (`AD_FIELD`), as on the `Financial Account` buttons | A resolve action can appear only on open items |
 
-Custom work remains for reconciliation-specific behaviour: Match Statement's Search, Add and Unmatch row buttons are hand-written (`APRMMatchStatGridButtonsComponent`), and an HQL-based table filtered by its opening screen needs a small code filter (`HqlQueryTransformer`).
+Reconciliation-specific behaviour stays custom: Match Statement's row buttons Search, Add and Unmatch (undo a match) are hand-written (`APRMMatchStatGridButtonsComponent`), and an HQL-based table filtered by its opening screen needs a small code filter (`HqlQueryTransformer`).
 
 ### 1.3 Existing Screens the Workbench Should Mirror
 
-Three existing screens each do part of the workbench's job, so copying their layout and actions shortens the build; two sit in today's reconciliation flow (Analysis 1, Section 1.2), which keeps the workbench familiar.
+Three screens each do part of the workbench's job, so copying their layout and actions shortens the build; users know two from today's reconciliation flow (Analysis 1, Section 1.2).
 
 | Screen | What it does today | Why the workbench should mirror it | What not to copy |
 |--------|--------------------|------------------------------------|------------------|
-| `Match Statement`, a process definition opened from `Financial Account` | Lists one account's processed lines beside their matched transactions, with how each was matched and whether it is cleared, meaning agreed with the bank (`aprm_matchstatement`). Rows have Search, Add and Unmatch buttons, ticked rows unmatch together (`UnMatchSelectedTransactionsActionHandler`), and Reconcile completes the period (`MatchStatementActionHandler`) | It shows the workbench's records and every way to resolve them, so its server actions, buttons and HQL-based grid can be reused | Its query covers one account and only lines unmatched or in its draft (unfinished) reconciliation (`MatchStatementTransformer`); its prompt and instant saving are limits in Analysis 1, Section 3.3 |
-| `OBUIAPP_AlertManagement`, the manual view users open as `Alert Management` | Lists alerts (system-generated to-do messages sent to a user or role) for the signed-in user, or their role when no user is named (`ADAlertDatasourceService`), in New, Acknowledged, Suppressed and Solved sections with counts; users move ticked items between them, add a note and open the record (`OBAlertGrid`) | It is the closest screen to an exceptions worklist: a personal queue, status groups with counts, bulk status changes, notes and a link to the source, centred on each item's owner | Its four statuses are fixed in code, with no reason code or reassignment; copy its layout in a generated window or pop-up, not its code |
-| `Financial Account`, a standard window | Shows each account with tabs for transactions, imported statements, their lines and reconciliations (`Imported Bank Statements`, `Bank Statement Lines`, `Reconciliations`), and buttons for Import Statement, Match Statement and manual Reconcile (`EM_APRM_IMPORTBANKFILE`, `EM_APRM_MATCHTRANSACTIONS`, `EM_APRM_RECONCILE`) | As a generated window it gives each record a form with notes, attachments, saved views and filters, and its buttons launch actions from the record they affect | Statement lines sit two tab levels below the account (`AD_TAB`), so finding every unmatched line means opening each account and statement; Import Statement and manual Reconcile open classic servlet pages |
-
-Figure 1 combines the three.
+| `Match Statement`, a process definition opened from `Financial Account` | Lists one account's processed lines beside their matched transactions, how each was matched and whether it is cleared, meaning agreed with the bank (`aprm_matchstatement`). Ticked rows unmatch together (`UnMatchSelectedTransactionsActionHandler`); Reconcile completes the period (`MatchStatementActionHandler`) | It shows the workbench's records and every way to resolve them, so its server actions, buttons and grid are reusable | Its query covers only one account's lines unmatched or in its draft (unfinished) reconciliation (`MatchStatementTransformer`); its prompt and instant saving are limits in Analysis 1, Section 3.3 |
+| `Alert Management` (`OBUIAPP_AlertManagement`), a manual view | Lists each alert (a system-generated to-do message sent to a user or role) of rules whose recipients name the signed-in user, or their role when no user is named (`ADAlertDatasourceService`, `AD_ALERTRECIPIENT`), in New, Acknowledged, Suppressed and Solved sections with counts; users move ticked items between sections, add notes and open records (`OBAlertGrid`) | This status-grouped queue is the closest screen to an exceptions worklist. A rule's recipients share its alerts and status, so owner-specific queues need the owner data and filtering in Section 2.2 of this document | Its four statuses are hard-coded, with no reason code or reassignment; rebuild its layout as a generated screen |
+| `Financial Account`, a standard window | Shows each account with tabs for transactions, `Imported Bank Statements`, `Bank Statement Lines` and `Reconciliations`, and Import Statement, Match Statement and manual Reconcile buttons (`EM_APRM_IMPORTBANKFILE`, `EM_APRM_MATCHTRANSACTIONS`, `EM_APRM_RECONCILE`) | As a generated window it gives each record notes, attachments, saved views and filters, with buttons acting on that record | Statement lines sit two tab levels below the account (`AD_TAB`), so finding every unmatched line means opening each account and statement; Import Statement and manual Reconcile open classic servlets |
 
 ### 1.4 Proposed Workbench Screen Layout
 
-Figure 1 is a wireframe (a rough sketch of where things sit on a screen) of one possible workbench screen; every area is proposed, copies the pattern or screen in parentheses from Sections 1.2 and 1.3 of this document, and implies no field names or data.
+Figure 1 is a workbench wireframe (a rough sketch of where things sit on a screen) drawn from Sections 1.2 and 1.3 of this document, without field names or data.
 
 **Figure 1. Proposed Workbench Screen Layout**
 
 ```mermaid
 flowchart TB
+  accTitle: Figure 1. Proposed Workbench Screen Layout
+  accDescr: Three proposed bands: counts and filters, work area, and actions
   subgraph SCREEN["Proposed: Workbench screen"]
     subgraph TOPBAND["Proposed: Top band"]
       COUNTS["Proposed: Counts by age, owner and reason (OBCQL_WIDGET_QUERY)"]
@@ -76,8 +76,8 @@ flowchart TB
     end
     subgraph WORKAREA["Proposed: Work area"]
       DETAIL["Proposed: Selected item detail (Financial Account)"]
-      WORKLIST["Proposed: Cross-account worklist with each line's age (aprm_matchstatement)"]
-      STATUS["Proposed: Status sections with item counts (OBUIAPP_AlertManagement)"]
+      WORKLIST["Proposed: Cross-account worklist with line ages (aprm_matchstatement)"]
+      STATUS["Proposed: Status sections with counts (OBUIAPP_AlertManagement)"]
     end
     subgraph ACTIONBAND["Proposed: Action band"]
       NOTES["Proposed: Notes and last change (OBUIAPP_NOTE)"]
@@ -85,33 +85,29 @@ flowchart TB
       ROWACTIONS["Proposed: Row search, add and unmatch (APRMMatchStatGridButtonsComponent)"]
     end
   end
-  FILTER ~~~ STATUS
-  FILTER ~~~ WORKLIST
-  COUNTS ~~~ DETAIL
-  STATUS ~~~ ROWACTIONS
-  WORKLIST ~~~ BULK
-  DETAIL ~~~ NOTES
-  class FILTER,COUNTS,STATUS,WORKLIST,DETAIL,ROWACTIONS,BULK,NOTES proposed
-  class SCREEN,TOPBAND,WORKAREA,ACTIONBAND proposed
+  FILTER ~~~ STATUS ~~~ ROWACTIONS
+  FILTER ~~~ WORKLIST ~~~ BULK
+  COUNTS ~~~ DETAIL ~~~ NOTES
+  class FILTER,COUNTS,STATUS,WORKLIST,DETAIL,ROWACTIONS,BULK,NOTES,SCREEN,TOPBAND,WORKAREA,ACTIONBAND proposed
   classDef proposed stroke-dasharray: 5 5,fill:#fff3cd,stroke:#b8860b
 ```
 
-**How to read this:** Each dashed box is a proposed screen area, top to bottom as a user would see it, with the existing pattern or screen it copies in parentheses.
+**How to read this:** Dashed boxes are proposed screen areas, read top to bottom, each with the existing pattern or screen it follows in parentheses.
 
-| Proposed area (what it copies) | Why it serves the objective |
+| Proposed area (built on) | Why it serves the objective |
 |--------------------------------|-----------------------------|
-| Filters (`OBGrid`, saved views in `OBUIAPP_UIPERSONALIZATION`) | Each owner opens straight onto their own items |
-| Counts (`OBCQL_WIDGET_QUERY`) | Shows where items pile up by age, owner and reason |
-| Status sections (`OBUIAPP_AlertManagement`) | Keeps every item visible until it is resolved |
-| Cross-account worklist (`aprm_matchstatement` without its one-account filter) | Replaces opening accounts one by one, and shows each line's age |
+| Filters (`OBGrid`, saved views in `OBUIAPP_UIPERSONALIZATION`) | Owners open onto their own items |
+| Counts (`OBCQL_WIDGET_QUERY`) | Shows the backlog by age, owner and reason |
+| Status sections (`OBUIAPP_AlertManagement`) | Keeps every item visible until resolved |
+| Cross-account worklist (a new HQL-based table like `aprm_matchstatement`, whose own `HqlQueryTransformer` filter keeps each account's lines unmatched or in its draft, within the user's access) | Replaces opening accounts one by one; shows each line's age |
 | Item detail (a `Financial Account` style form) | Edits one item's owner, reason and status, once added |
-| Row actions (`APRMMatchStatGridButtonsComponent`) | Keeps today's Search, Add and Unmatch actions |
-| Bulk actions (`OBUIAPP_PickAndExecute`) | Handles many items in one step and reports the outcome (`ResponseActionsBuilder`) |
+| Row actions (`APRMMatchStatGridButtonsComponent`) | Reuses Unmatch unchanged; Search and Add need each row's account to find its draft (`FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler`) |
+| Bulk actions (`OBUIAPP_PickAndExecute`) | Handles many items at once, reporting the outcome (`ResponseActionsBuilder`) |
 | Notes and last change (`OBUIAPP_NOTE`, `OBAuditSectionItem`) | Records why an item is open and who touched it last |
 
-Section 5.1 of this document places the worklist, exception fields and counts widget among the first capabilities (things the workbench lets people or the system do); how many items the worklist would hold, and so how fast it loads, is not determinable from code.
+Section 5.1 of this document places the worklist, exception fields and counts widget among the first capabilities (each something the workbench lets people or the system do); the worklist's size and loading speed are not determinable from code.
 
-**Requirement implications:** Requirements should specify generated windows, Pick and Execute pop-ups, an HQL-based cross-account list and a counts widget modelled on the screens in Section 1.3 of this document, and exclude classic servlets.
+**Requirement implications:** Requirements should specify generated windows, Pick and Execute pop-ups, a new HQL-based cross-account list and a counts widget, modelled on Section 1.3 of this document, not classic servlets.
 
 ## 2. Reusable Components
 
@@ -292,7 +288,7 @@ An integration point is a place where the workbench connects to existing code, d
 | Automatic matching | `StandardMatchingAlgorithm` and `MatchTransactionDao` link lines to transactions under the account's `FIN_MATCHING_ALGORITHM` record (Analysis 1, Section 3) | Moving or changing matching alters which lines clear and can create wrong strong matches; editing a shared record changes every account using it | High | Untested: no test refers to `StandardMatchingAlgorithm`, `MatchTransactionDao` or `FIN_MatchingAlgorithm`; `FinancialAccountTest` creates accounts with no matching algorithm record | Before matching changes, add regression tests running each pass of Analysis 1, Section 3.1 on fixed sample lines, and pilot new rules on a new record chosen by one account, comparing results on the same statements |
 | Manual match, split, unmatch | `APRM_MatchingUtility` links, splits and merges lines, and unmatch deletes algorithm-created transactions and payments (Analysis 1, Section 4.2) | Splits, merges and deletion of algorithm-created records must keep exception data consistent (Section 3.1 of this document) | High | Untested: no test refers to `APRM_MatchingUtility` or the grid's action handlers, such as `FindTransactionsToMatchActionHandler` | Define which exception fields a split part inherits and a merge keeps, and test split, merge and unmatch with them filled, including after posting |
 | Match Statement grid | `aprm_matchstatement`, the HQL-based table behind the `Match Statement` grid, from which `MatchStatementActionHandler` reconciles | Extra query columns can slow or break the grid, which stops statement reconciliation | High | Partial: `src-test/src/org/openbravo/test/datasource/HQLDataSourceTest.java`, in `WebserviceTestSuite`, filters another HQL-based table, `Aprm_Credit_To_Use`; nothing tests `aprm_matchstatement`, its speed or the grid's screen code | Build the worklist as a new HQL-based table rather than widening `aprm_matchstatement`, and test and time both like `HQLDataSourceTest` on the largest account |
-| Reconciliation completion and balances | `FIN_ReconciliationProcess` completes once each cleared item's accounting period (a span open for bookings) is open (`APRM_PeriodNotAvailableClearedItem`); `FIN_ReconciliationEventListener` recalculates later balances when a reconciliation is deleted | Holding completion for open exceptions changes how later balances are recalculated | High | Untested: no test refers to `FIN_ReconciliationProcess` or `FIN_ReconciliationEventListener` | Make any completion hold for open exceptions a per-account setting, off by default, and test completing, reactivating (reopening for editing) and deleting a reconciliation against later balances |
+| Reconciliation completion and balances | `FIN_ReconciliationProcess` completes once, for organizations with accounting, each cleared item's accounting period (a span open for bookings) is open (`APRM_PeriodNotAvailableClearedItem`); `FIN_ReconciliationEventListener` recalculates later balances when a reconciliation is deleted | Holding completion for open exceptions changes how later balances are recalculated | High | Untested: no test refers to `FIN_ReconciliationProcess` or `FIN_ReconciliationEventListener` | Make any completion hold for open exceptions a per-account setting, off by default, and test completing, reactivating (reopening for editing) and deleting a reconciliation against later balances |
 | Posting | `DocFINReconciliation` writes a completed reconciliation's entries to `FACT_ACCT`, from the Post button or the background `AcctServerProcess` | Write-off (booking a small unexplained difference as an expense) or adjustment actions create entries posting must handle; a wrong entry changes the books | High | Partial: `src-test/src/org/openbravo/test/accounting/RecordID2Test.java`, in `StandaloneTestSuite`, reposts three sample reconciliations through `DocFINReconciliation` and checks balances; new write-off or adjustment entries and `AcctServerProcess` runs are uncovered | Add `RecordID2Test` cases posting a reconciliation with a workbench-created fee or write-off, and try write-off on a test copy of the data first |
 | Payments feeding candidates | `FIN_PaymentProcess` creates a payment's transaction, a matching candidate, when the payment is deposited or withdrawn, explicitly or automatically by its payment method. Fund transfers (`APRM_FUND_TRANSFER_REC`) create their own transactions through `FundsTransferUtility` and process them through `FIN_TransactionProcess`, independently of payment-method settings | Payment status changes alter the transactions matching can choose from | High | Partial: `src-test/src/org/openbravo/test/cancelandreplace/CancelAndReplaceTestUtils.java`, helper of `CancelAndReplaceTest` in `StandaloneTestSuite`, processes payments through `FIN_PaymentProcess`, as `src-test/src/org/openbravo/advpaymentmngt/test/TestUtility.java` does for payment and payment-proposal tests such as `PaymentTest_01`; these and `FundsTransferTest`, checking transfer transactions, run only through `run.test`. Matching's use of the resulting transactions is uncovered | Test that a payment whose method deposits automatically yields a matching candidate, and add the payment and transfer tests to `StandaloneTestSuite` |
 | Partner names | Business partner (customer or supplier) records (`C_BPARTNER`), outside the reconciliation module, feed the import's partner guess (`FIN_BankStatementImport`) and the name switch (`MatchTransactionDao`) | Partial-name or learned partner matching can pick the wrong partner and transaction | High | Untested: no test refers to `FIN_BankStatementImport` or `MatchTransactionDao`, which hold partner guessing and name matching | Test near-identical partner names against the import guess and the name switch, and apply partial or learned partner matches as weak matches for the weak-match queue (Section 5.2 of this document) |
@@ -454,6 +450,7 @@ flowchart TB
 | Term | Plain definition |
 |------|------------------|
 | Accounting period | a span open for bookings |
+| Age | how long an unmatched item has been open |
 | Alert | a system-generated to-do message sent to a user or role |
 | Apache Ant | a build tool |
 | Application Dictionary | the metadata that defines screens, tables and processes |
@@ -470,11 +467,12 @@ flowchart TB
 | Client | the top-level company grouping that owns the data |
 | Confirmation flag | a mark that a person checked a weak match |
 | Cycle time | the time from statement import to completed reconciliation |
+| Dashboard | a summary start page |
 | Database query | a saved request that selects records |
 | Dataset | packaged setup data |
 | Dependency | what must exist before a capability can work |
 | Draft | unfinished |
-| ERP | enterprise resource planning, the business software that keeps the company's accounts |
+| ERP | enterprise resource planning, business-management software |
 | Financial account | the ERP record for one bank account |
 | Full-scope tier | the tier that completes the minimum-viable tier |
 | General ledger | the company's books |
@@ -495,6 +493,7 @@ flowchart TB
 | Match strength | how a line was matched: strong, weak, by hand, or to a transaction added by hand |
 | Matching | linking a statement line to the transaction it settles |
 | Matching algorithm record | a saved set of matching rules that one or more financial accounts use |
+| Metadata | stored records, not code |
 | Minimum-viable tier | the smallest set of capabilities meeting the objective's basic needs |
 | Mitigation | a concrete step that lowers the risk |
 | Mockito | a tool that fakes other program parts in tests |
@@ -520,20 +519,23 @@ flowchart TB
 | Role inheritance | one role taking over another's grants |
 | Saved view | a user's stored columns and filters |
 | Schema | the database structure |
+| Server | the computer running the ERP |
 | Servlet, classic | an older, hand-coded web page |
 | Split and merge | dividing a line into a matched part and an unmatched remainder, and rejoining its unmatched parts |
 | Standard window | a data-entry screen with a header and sub-tabs |
 | Strong match | a candidate found by the algorithm's primary rules |
+| Template | a layout file |
 | Test suite | a named bundle of tests |
 | Tier | a package of capabilities delivered together |
 | Tolerance settings | how far amounts and dates may differ and still match |
 | Transaction | the ERP's record of money expected in or out of a financial account |
 | Trigger | a database rule run on every change |
+| Unmatch | undo a match |
 | View (database) | a saved query the database presents as a table |
 | Weak match | a candidate found only by its looser fallback rules |
 | WebSocket | a live browser connection |
 | Wireframe | a rough sketch of where things sit on a screen |
-| Workspace and Query/List widgets | small panels on the Workspace dashboard, the latter showing a query's result |
+| Workspace and Query/List widgets | small panels on the Workspace dashboard; Query/List widgets show a query's result |
 | Write-off | booking a small unexplained difference as an expense |
 | XML | structured text |
 
@@ -543,12 +545,12 @@ Supports Section 1.2 of this document.
 
 | Pattern | Stored in | Permission granted in |
 |---------|-----------|-----------------------|
-| Standard window | `AD_WINDOW`, `AD_TAB`, `AD_FIELD` and the table's `AD_COLUMN` records | `AD_WINDOW_ACCESS` |
-| Process definition, Pick and Execute | `OBUIAPP_PROCESS`, its `OBUIAPP_PARAMETER` records and the grid window it shows (`OBUIAPP_REF_WINDOW`) | `OBUIAPP_PROCESS_ACCESS`, or the opening window's grant |
-| HQL-based table | An `AD_TABLE` record holding the query (`HQLQUERY`), with an optional `HqlQueryTransformer` | Read access to the list, checked on each fetch (`HQLDataSourceService`) |
+| Standard window | `AD_WINDOW`, `AD_TAB`, `AD_FIELD` and `AD_COLUMN` records | `AD_WINDOW_ACCESS` |
+| Process definition, Pick and Execute | `OBUIAPP_PROCESS`, its `OBUIAPP_PARAMETER` records and its grid window (`OBUIAPP_REF_WINDOW`) | `OBUIAPP_PROCESS_ACCESS`, or the opening window's grant |
+| HQL-based table | An `AD_TABLE` record holding the query (`HQLQUERY`), with an optional `HqlQueryTransformer` | Read access, checked on each fetch (`HQLDataSourceService`) |
 | Manual view | An `OBUIAPP_VIEW_IMPL` record naming hand-written JavaScript | `OBUIAPP_VIEW_ROLE_ACCESS` |
-| Workspace and Query/List widgets | `OBKMO_WIDGET_CLASS`, plus `OBCQL_WIDGET_QUERY` and `OBCQL_QUERY_COLUMN` for Query/List; each user's placed widgets (`OBKMO_WIDGET_INSTANCE`) are installation data, not determinable from code | `OBKMO_WIDGET_CLASS_ACCESS` |
-| Classic servlet | An `AD_PROCESS` record linked to its Java class through `AD_MODEL_OBJECT`, plus a hand-written page template such as `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_actionbutton/ImportBankFile.html` | `AD_PROCESS_ACCESS`, checked on each page request (`HttpSecureAppServlet`) |
+| Workspace and Query/List widgets | `OBKMO_WIDGET_CLASS`, plus `OBCQL_WIDGET_QUERY` and `OBCQL_QUERY_COLUMN` for Query/List; placed widgets (`OBKMO_WIDGET_INSTANCE`) are installation data, not determinable from code | `OBKMO_WIDGET_CLASS_ACCESS` |
+| Classic servlet | An `AD_PROCESS` record linked to its Java class through `AD_MODEL_OBJECT`, plus a page template such as `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_actionbutton/ImportBankFile.html` | `AD_PROCESS_ACCESS`, checked per page request (`HttpSecureAppServlet`) |
 
 ## Appendix C. Component Details
 
