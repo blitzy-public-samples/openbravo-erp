@@ -19,7 +19,7 @@ The workbench serves one objective: "reduce manual effort and cycle time in bank
 - **Data:** PostgreSQL (the database), with each table's structure kept as XML (structured text) files under `src-db/database/model` and in each module's (a separately packaged part of the ERP) own database folder.
 - **Java tests:** JUnit 4.13.2 (a Java test framework) and Mockito 4.11.0 (a tool that fakes collaborators in tests), both in `lib/test`, with tests in `src-test/src` and in module folders such as `modules/org.openbravo.client.application/src-test`.
 - **Test runs:** `src-test/build.xml` runs two test suites (named bundles of tests): `run.all.tests` runs `StandaloneTestSuite`, `run.webservice.tests` runs `WebserviceTestSuite`, and `run.test` runs any single test, including those in neither suite.
-- **Browser tests:** Jest 29.7 (a JavaScript test runner), declared in `package.json`. The only user-interface tests are three utility tests in `modules/org.openbravo.client.application/web-test`, so new workbench screens start with no automated screen tests.
+- **User-interface tests:** Jest 29.7 (a JavaScript test runner), declared in `package.json`, runs three utility test files in `modules/org.openbravo.client.application/web-test`. `ViewGeneration`, in `StandaloneTestSuite`, only checks that screen definitions generate without errors. No test clicks through a screen, so new workbench screens start with no automated screen-interaction tests.
 
 ### 1.2 Patterns for Windows, Views and Dashboards
 
@@ -40,10 +40,10 @@ Reuse fit is High when the component meets the workbench need through configurat
 
 | Component | What exists | Reuse fit (High/Medium/Low) |
 |-----------|-------------|-----------------------------|
-| Roles and permissions | Each role is granted windows, processes and process definitions (`AD_WINDOW_ACCESS`, `AD_PROCESS_ACCESS`, `OBUIAPP_PROCESS_ACCESS`), and role inheritance (one role taking over another's grants) is handled by `RoleInheritanceManager`. The standard Finance role in `modules/org.openbravo.v3.datasets` already holds the reconciliation windows and processes. Access is per screen, not per record, so ownership must come from the data | High |
-| Audit trail | An audit trail (a log of who changed which field, and when) is kept in `AD_AUDIT_TRAIL` and shown in the `Audit Trail` window and per record by `AuditTrailPopup`. It is switched on table by table (`ISFULLYAUDITED`) and is off by default. Every table already records who created and last changed each row | Medium (see the note below the table) |
+| Roles and permissions | Each role is granted windows, processes and process definitions (`AD_WINDOW_ACCESS`, `AD_PROCESS_ACCESS`, `OBUIAPP_PROCESS_ACCESS`), and role inheritance (one role taking over another's grants) is handled by `RoleInheritanceManager`. The standard Finance role in `modules/org.openbravo.v3.datasets` holds the reconciliation windows (Bank File Format, Matching Algorithm, Financial Account) and processes (Reconciliation Details, Reconcile, Import Statement, Reconciliation Summary). Roles are also granted organizations (companies or branches) in `AD_ROLE_ORGACCESS`, limiting which records they see, but no grant assigns records an owner, so ownership must come from the data | High |
+| Audit trail | An audit trail (a log of who changed which field, and when) is kept in `AD_AUDIT_TRAIL` and shown in the `Audit Trail` window and per record by `AuditTrailPopup`. It is switched on table by table (`ISFULLYAUDITED`) and is off by default. Reconciliation tables such as `FIN_BANKSTATEMENTLINE` already record who created and last changed each row, and when (`CREATED`, `UPDATED`) | Medium (see the note below the table) |
 | Notifications | Alerts (system-generated to-do messages sent to a user or role) come from rules written as database queries (`AD_ALERTRULE`) and carry a status, user, role and note (`AD_ALERT`), with optional email (`AD_ALERTRECIPIENT`). `AlertProcess`, scheduled in the core setup data, raises one alert per new item and closes it once the rule stops returning that item, so an alert on an unmatched line would clear itself when the line is matched. Users acknowledge or suppress alerts in the Alert Management view; a WebSocket (live browser connection) client, `MessageClientManager`, and free-text record notes, `OBUIAPP_NOTE`, also exist | High |
-| Background processes and scheduling | Background processes (jobs the system runs on a schedule without a user) run on a Quartz-backed scheduler (built on the Quartz job library), `OBScheduler`, through process requests (saved schedules for one job) in `AD_PROCESS_REQUEST`, each run logged in `AD_PROCESS_RUN`. `FIN_BankStatementProcess` and `FIN_ReconciliationProcess` are already written in the form the scheduler runs. Automatic matching, however, sits inside a screen action, `MatchStatementOnLoadActionHandler`, so it must be moved out before it can run without a user | High |
+| Background processes and scheduling | Background processes (jobs the system runs on a schedule without a user) run on a Quartz-backed scheduler (built on the Quartz job library), `OBScheduler`, through process requests (saved schedules for one job) in `AD_PROCESS_REQUEST`, set in the `Process Request` window, each run logged in `AD_PROCESS_RUN`, reviewed in `Process Monitor`. `FIN_BankStatementProcess` and `FIN_ReconciliationProcess` are already written in the form the scheduler runs. Automatic matching, however, sits inside a screen action, `MatchStatementOnLoadActionHandler`, so it must be moved out before it can run without a user | High |
 | Reporting | The reconciliation PDF, `ReportReconciliation`, lists outstanding payments, outstanding deposits and unreconciled statement lines. Newer reports run as process definitions through `BaseReportActionHandler`, and Query/List widgets (`OBCQL_WIDGET_QUERY`) can show counts. No report breaks unmatched lines down by age, owner or reason | Medium |
 
 **Unconfirmed:** whether reconciliation tables are audited today, because auditing is switched on table by table in each installation and is off by default (consulted `AD_TABLE`, `ISFULLYAUDITED`, `AD_AUDIT_TRAIL`).
@@ -55,7 +55,7 @@ Analysis 1, Section 4.3 describes the gaps; this table pairs each need with what
 | Current schema already supports | Change required |
 |---------------------------------|-----------------|
 | Unmatched state: a line in `FIN_BANKSTATEMENTLINE` with an empty `FIN_FINACC_TRANSACTION_ID` | An explicit exception status, for example open, assigned or resolved |
-| Age, derived from the bank date `DATETRX` or the import time `CREATED` | None; age is calculated, not stored |
+| Age, derived from the bank date `DATETRX` or the record creation time `CREATED` | None; age is calculated, not stored |
 | Who created or last changed a line (`CREATEDBY`, `UPDATEDBY`) | An owner (a user) for each unmatched item |
 | Free text in `DESCRIPTION` | A list of reason codes and a reason on each item |
 | Match strength in `MATCHINGTYPE`: AU strong (found by the algorithm's primary rules), AP weak (found only by its looser fallback rules), MA matched by hand, and AD linked to a transaction added by hand; plus what the line was matched against in `MATCHED_DOCUMENT` | A confirmation flag, needed only for the weak-match queue in Section 5.2 of this document |
@@ -70,7 +70,7 @@ An area is tested when a test in the repository exercises that area's own behavi
 | Area | Integration point | Regression risk | Tested |
 |------|-------------------|-----------------|--------|
 | Statement import | `ImportBankFile`, `FIN_BankStatementImport`, installed bank file format modules (add-ons that each read one bank's file layout) | New line fields must not break the format modules that create lines | untested (no test refers to either class) |
-| Statement processing | `FIN_BankStatementProcess`, `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Date checks and line locks can block exception updates | untested (no test refers to either) |
+| Statement processing | `FIN_BankStatementProcess`, `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Date checks and line locks can block exception updates that alter bank data or add or remove processed lines | untested (no test refers to either) |
 | Automatic matching | `StandardMatchingAlgorithm`, `MatchTransactionDao`; see Analysis 1, Section 3 | Moving or changing matching alters which lines clear and can create wrong strong matches; editing a shared `FIN_MATCHING_ALGORITHM` record changes every account that uses it | untested (no test refers to the matching classes) |
 | Manual match, split, unmatch | `APRM_MatchingUtility` | Splits, merges and deletion of algorithm-created records must keep exception data consistent | untested (no test refers to it) |
 | Match Statement grid | `aprm_matchstatement` | Extra query columns can slow or break the grid | untested (`HQLDataSourceTest`, in `WebserviceTestSuite`, covers HQL-based tables only on `Aprm_Credit_To_Use`; the Match Statement query and its speed are not covered) |
@@ -83,15 +83,13 @@ An area is tested when a test in the repository exercises that area's own behavi
 | Reporting | `ReportReconciliation` and its JasperReports (report-layout engine) templates | Template changes stop the report from building | tested (building only: `AllJrxmlCompilation`, in `StandaloneTestSuite`; the reconciliation report's content is not covered) |
 | Audit trail | `AD_AUDIT_TRAIL`, `ISFULLYAUDITED` | Auditing busy tables adds database write load | untested (`ETagGeneration` switches auditing on `C_ORDER` only to test browser page caching; no test reads the audit trail) |
 
-Import, matching, manual resolution and completion, the areas the workbench touches most, are all untested, so each change there needs new tests before release.
+Import, matching, manual resolution and completion, the areas the workbench touches most, are all untested, so no test would catch a change breaking them.
 
 ## 5. Recommended Capability Set
 
 Impact is High when a capability itself raises the share of lines matched with no person acting, or itself gives unmatched items an owner, age or reason code; Medium when it cuts the effort or cycle time of work people still do; Low when it only measures, records or displays the work. Effort S means configuration or metadata on an existing component; M means new fields, a screen, a process definition or a background process built from existing patterns; L means new or changed matching logic in an untested area.
 
-Each tier is ranked by impact (High, Medium, Low), then effort (S, M, L); ties keep the order of the effort sources in Analysis 1, Section 5, lowest item number first, then the order shown. Item numbers below refer to those effort sources, and each capability names the existing part it reuses.
-
-**Assumption:** effort sizes assume reuse of the patterns and components in Sections 1 and 2 of this document.
+Each tier is ranked by impact (High, Medium, Low), then effort (S, M, L); ties keep the order of the effort sources in Analysis 1, Section 5, lowest item number first, then the order shown. Item numbers below refer to those effort sources, and each capability names the existing part it reuses. **Assumption:** effort sizes assume reuse of the patterns and components in Sections 1 and 2 of this document.
 
 ### 5.1 Minimum-Viable Tier
 
@@ -102,7 +100,7 @@ These capabilities give every unmatched item an owner, age and reason, and match
 | 1 | Cross-account exceptions worklist showing each unmatched line's age (items 1 and 4; an HQL-based table like `aprm_matchstatement`) | High | M |
 | 2 | Owner, reason code and status on every unmatched line (item 4; new fields on `FIN_BANKSTATEMENTLINE`) | High | M |
 | 3 | Automatic matching after each import as a scheduled background process (item 5; `OBScheduler`) | High | M |
-| 4 | Alerts to owners for aging and unassigned items (item 4; `AD_ALERTRULE`, `AlertProcess`) | Medium | S |
+| 4 | Alerts to owners for aging items and to the Finance role for unassigned items (item 4; `AD_ALERTRULE`, `AlertProcess`, `AD_ALERTRECIPIENT`) | Medium | S |
 | 5 | Dashboard widget with exception counts by age, owner and reason (item 4; `OBCQL_WIDGET_QUERY`) | Low | S |
 
 ### 5.2 Full-Scope Tier
