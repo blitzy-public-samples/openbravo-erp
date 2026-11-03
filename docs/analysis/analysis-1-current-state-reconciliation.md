@@ -367,17 +367,17 @@ flowchart LR
 
 ## 3. Existing Matching Logic
 
-**What this section tells you:** The automatic rules link a statement line to a transaction only when the amounts agree exactly, and the first candidate found wins; other details count only where a pass compares them, and a GL-item line accepts an earlier-dated transaction. A few settings, mostly shared between accounts, decide how strict they are; each criterion, rule set (Section 3.1) and setting (Section 3.2) comes with its default, how an administrator changes it and a failure example.
+**What this section tells you:** Automatic rules link a statement line to a transaction only when the amounts agree exactly, and the first candidate wins; other details count only where a pass compares them, and a GL-item line accepts an earlier-dated transaction. Fixed gates and a few mostly shared settings decide what is compared, each with its default, how an administrator changes it and a failure example (Sections 3.1 and 3.2).
 
 ### 3.1 Criteria and Algorithm
 
-The standard rules (`StandardMatchingAlgorithm`, searching through `MatchTransactionDao`) try these passes (rounds of checks) in order and keep the first candidate found. A strong match is a candidate found by the algorithm's primary rules (passes 1 and 3), and a weak match is a candidate found only by its looser fallback rules (passes 2 and 4; `FIN_MatchedTransaction`). Figure 8 shows the passes for one line.
+The standard rules (`StandardMatchingAlgorithm`) try these passes (rounds of checks) in order. A strong match is a candidate found by the algorithm's primary rules, and a weak match is a candidate found only by its looser fallback rules (`FIN_MatchedTransaction`). Figure 8 shows the passes for one line.
 
 | Pass | Applies when | What must agree | Result |
 |------|--------------|-----------------|--------|
 | 1 | Line carries a GL item | Same GL item, exact amount, transaction dated on or before the line | Strong (`AU`) |
-| 2 | Pass 1 found nothing | Same GL item and exact amount, any date; if this also fails, the line goes on to pass 3 | Weak (`AP`) |
-| 3 | Every line not matched by pass 1 or 2 | Exact amount, plus each criterion whose switch is on: date, reference and partner name (criteria below). A switched-off criterion is not compared, so a difference in it does not prevent a strong match | Strong (`AU`) |
+| 2 | Pass 1 found nothing | Same GL item and exact amount, any date | Weak (`AP`) |
+| 3 | Every line not matched by pass 1 or 2 | Exact amount, plus each switched-on criterion below: date, reference unless the line's is empty or a double asterisk, and partner name; a difference in a switched-off or skipped criterion cannot block a strong match | Strong (`AU`) |
 | 4 | Pass 3 found nothing | Exact amount, plus exact date if the date switch is on | Weak (`AP`) |
 | 5 | Nothing found | — | No match (`NO`) |
 
@@ -385,86 +385,90 @@ The standard rules (`StandardMatchingAlgorithm`, searching through `MatchTransac
 
 ```mermaid
 flowchart TD
-    L["Next unmatched line, oldest first (APRM_MatchingUtility)"] --> G{"Line carries a GL item?"}
-    G -- Yes --> P1{"Pass 1: same GL item, exact amount, dated on or before the line?"}
-    G -- No --> P3{"Pass 3: exact amount and every switched-on criterion?"}
-    P1 -- Yes --> S["Strong match (AU)"]
-    P1 -- No --> P2{"Pass 2: same GL item, exact amount, any date?"}
-    P2 -- Yes --> W["Weak match (AP)"]
-    P2 -- No --> P3
-    P3 -- Yes --> S
-    P3 -- No --> P4{"Pass 4: exact amount, and same date if the date switch is on?"}
-    P4 -- Yes --> W
-    P4 -- No --> N["No match, left for a person (NO)"]
-    S --> K["Link saved; transaction no longer offered (MatchStatementOnLoadActionHandler)"]
+    accTitle: Figure 8. Matching Decision Flow for One Bank Line
+    accDescr: Each line runs the passes in order until one finds a candidate, which sets the match strength.
+    L["Next eligible line, oldest first (APRM_MatchingUtility)"] --> G{"Line carries a GL item?"}
+    G -->|Yes| P1{"Pass 1: same GL item, exact amount, dated on or before the line?"}
+    G -->|No| P3{"Pass 3: exact amount and every switched-on criterion, skipping an empty or double-asterisk reference?"}
+    P1 -->|Yes| S["Strong match (AU)"]
+    P1 -->|No| P2{"Pass 2: same GL item, exact amount, any date?"}
+    P2 -->|Yes| W["Weak match (AP)"]
+    P2 -->|No| P3
+    P3 -->|Yes| S
+    P3 -->|No| P4{"Pass 4: exact amount, plus same date if the switch is on?"}
+    P4 -->|Yes| W
+    P4 -->|No| N["No match, left for a person (NO)"]
+    S --> K["Linked if saved; either way counted and its transaction no longer offered (MatchStatementOnLoadActionHandler)"]
     W --> K
 ```
 
-**How to read this:** Follow one bank line down through the Yes and No answers; the box where the path ends is how the automatic run leaves it.
+**How to read this:** Follow one line down the Yes and No answers; the box where its path ends is how the automatic run leaves it.
 
-Candidates are processed, unreconciled transactions of the same account not already cleared (status `RPPC`), minus those matched earlier in the run; a payment joins them only once its transaction exists (Section 3.2), and an unprocessed transaction stays out until someone processes it (`FIN_TransactionProcess`). Lines are tried oldest first, then by line number and partner name, with no setting to change the order, and each link is saved before the next line is tried (`APRM_MatchingUtility`, `MatchStatementOnLoadActionHandler`). Earlier lines therefore get first pick of shared candidates.
+These fixed gates, which no setting changes, decide which lines are tried and which transactions they may take (`APRM_MatchingUtility`, `MatchTransactionDao`).
+
+- Lines: unmatched lines of the account's processed statements (Section 4.1), and, when the draft is not the latest reconciliation (Section 1.3), only those dated on or before its end date (`APRM_MatchingUtility`, `MatchTransactionDao`); for example, with March reopened after April's completion, a 2 April line is not tried.
+- Line order: oldest first, then line number and partner name (`APRM_MatchingUtility`), so earlier lines get first pick of shared candidates.
+- Candidates: the line's account only (`MatchTransactionDao`); for example, a payment into the company's other bank account is never offered.
+- Candidates: processed only; for example, a fee entered but not processed waits until processed (`FIN_TransactionProcess`).
+- Candidates: not already cleared, checked as no reconciliation and status not `RPPC`, which every link or tick sets together (`APRM_MatchingUtility`, `Reconciliation`); for example, a deposit ticked in last month's reconciliation is not offered again.
+- Candidates: not taken earlier in the run (`MatchStatementOnLoadActionHandler`); for example, of two 100.00 lines and one 100.00 payment, the older line wins it even when it belongs to the newer.
 
 | Criterion | Default behaviour | How an admin changes it | What defeats it, for example |
 |-----------|-------------------|-------------------------|------------------------------|
-| Same GL item (passes 1 and 2) | Only lines carrying a GL item (`C_GLITEM_ID`), set by the file format, by hand or copied at import from an earlier same-name line (`FIN_BankStatementImport`) | No setting | A fee line whose fee was never recorded falls to passes 3 and 4, which ignore the GL item, and can be linked to an unrelated same-amount payment (`StandardMatchingAlgorithm`) |
-| Dated on or before the line (pass 1) | Always, for GL-item lines, whatever the date switch says (`StandardMatchingAlgorithm`) | No setting | A fee recorded a day after the bank charged it fails pass 1 and is only a weak match in pass 2 (`MatchTransactionDao`) |
+| Same GL item (passes 1 and 2) | Only lines with a GL item (`C_GLITEM_ID`), set by the file format, by hand or at import (Section 1.2) | No setting | A line for an unrecorded fee falls to passes 3 and 4, which ignore the GL item, and can take an unrelated same-amount payment (`StandardMatchingAlgorithm`) |
+| Dated on or before the line (pass 1) | Always, whatever the date switch says (`StandardMatchingAlgorithm`) | No setting | A fee recorded a day after the bank charged it fails pass 1 and is only a weak match in pass 2 (`MatchTransactionDao`) |
 | Exact amount (every pass) | Money in minus money out must equal the transaction's deposit minus payment, to the cent (`MatchTransactionDao`) | No setting; only another rule set could relax it | A 1,000.00 receipt booked as 997.50 after a bank charge finds no candidate and waits for a person |
-| Exact date (passes 3 and 4) | Compared only with the date switch (`MATCHTRANSACTIONDATE`) on; both passes then need the same day | Date switch (Section 3.2) | A payment entered on the 30th that the bank books on the 1st is never matched automatically |
-| Reference (pass 3) | Only with the reference switch on and a line reference (`REFERENCENO`, a mandatory field) neither empty nor a double asterisk, which must equal the payment's reference or ERP-assigned document number (`FIN_PAYMENT`) | Reference switch (Section 3.2) | A customer quoting the invoice number, which is never compared, gets at best a weak match; a transaction with no payment, such as a bank fee, never passes |
-| Partner name (pass 3) | With the name switch on, the name the bank sent (`BPARTNERNAME`) must equal the payment partner's name (`C_BPARTNER`); the import's guessed partner (`C_BPARTNER_ID`) is ignored | Name switch (Section 3.2) | "ACME LTD" from the bank against partner "Acme Limited" fails even when the import guessed the right partner; a line with no partner name never passes against a partner's payment |
+| Exact date (passes 3 and 4) | Compared only with the date switch (`MATCHTRANSACTIONDATE`) on; both passes then need the same day | Date switch (Section 3.2) | With the switch on, passes 3 and 4 miss a payment entered on the 30th that the bank books on the 1st |
+| Reference (pass 3) | Only with the reference switch on and a line reference (`REFERENCENO`, mandatory) neither empty nor a double asterisk, which must equal the payment's reference or ERP-assigned document number (`FIN_PAYMENT`) | Reference switch (Section 3.2) | With the switch on, a customer quoting the invoice number, which is never compared, misses pass 3 and gets at best a weak match; a transaction with no payment, such as a bank fee, never passes it |
+| Partner name (pass 3) | With the name switch on, the name the bank sent (`BPARTNERNAME`) must equal the payment partner's name (`C_BPARTNER`); the import's guessed partner (`C_BPARTNER_ID`) is ignored | Name switch (Section 3.2) | "ACME LTD" from the bank against partner "Acme Limited" fails pass 3; a line with no partner name never passes it against a partner's payment |
 
-Three rule sets can decide a match (`FIN_MatchingAlgorithm`).
+One rule set ships, others can follow the interface (the contract every rule set follows, `FIN_MatchingAlgorithm`), and manual search is a separate path.
 
-| Rule set | Default behaviour | How an admin changes it | Limit or failure scenario, for example |
-|----------|-------------------|-------------------------|----------------------------------------|
-| Standard rules (`StandardMatchingAlgorithm`) | The only rule set in the repository; it links existing transactions and never creates one, though the prompt warns it may (`APRM_AlgorithmConfirm`) | Select a record that names it, then set its switches (Section 3.2) | A line the rules cannot evaluate stays unmatched (Section 4.1), and a run failing part-way reports the links already saved as a normal result (`MatchStatementOnLoadActionHandler`) |
-| Another rule set through the interface (the contract every rule set follows, `FIN_MatchingAlgorithm`) | Not used: no program in the repository follows the contract, which returns one transaction and match level per line and removes its own transactions when a link is undone | Install a module with such a program and enter its name as the record's program name (`CLASSNAME`) | The `Matching Algorithm` window then hides the three switches, and a line covering several transactions stays manual |
-| Manual search (`Find Transactions to Match`) | Lists the account's processed transactions not yet in a reconciliation, by default only those dated on or before the line, with no amount, name or reference filter (`TransactionsToMatchTransformer`) | No setting; the filter is defined in the Application Dictionary (the metadata that defines screens, tables and processes) | A payment entered a day after the bank date stays hidden until the user removes the filter (Section 4.2) |
+| Rule set or path | Default behaviour | How an admin changes it | Limit or failure scenario, for example |
+|------------------|-------------------|-------------------------|----------------------------------------|
+| Standard rules (`StandardMatchingAlgorithm`) | The only shipped program following the interface; it links existing transactions, never creating one, though the prompt warns it may (`APRM_AlgorithmConfirm`), and undoing its link deletes only algorithm-created records (Section 4.2) | Select a record naming it, then set its switches (Section 3.2) | A rule error counts as no match (Section 4.1), but a link that fails to save still counts as matched and its transaction is no longer offered, though the line stays unmatched; a run failing part-way keeps saved links and reports a normal count (`APRM_MatchingUtility`, `MatchStatementOnLoadActionHandler`) |
+| Another rule set | None ships; the interface asks for one transaction and match level per line and an undo step | Install a module with one and enter its name as the record's program (`CLASSNAME`) | The `Matching Algorithm` window then hides the three switches, and a line covering several transactions stays manual |
+| Manual search (`Find Transactions to Match`) | Lists the account's processed transactions not yet in a reconciliation, by default only those dated on or before the line, with no amount, name or reference filter (`TransactionsToMatchTransformer`) | No setting; the date filter is part of the screen's definition (`AD_TAB`) | A payment entered a day after the bank date stays hidden until the user removes the filter (Section 4.2) |
 
 ### 3.2 Configurability
 
-- Each financial account can select one matching algorithm record (`FIN_MATCHING_ALGORITHM_ID` on `FIN_FINANCIAL_ACCOUNT`). The record, kept in the `Matching Algorithm` window and `FIN_MATCHING_ALGORITHM`, names the program that applies the rules (`CLASSNAME`) and holds the three switches (`MATCHBPNAME`, `MATCHREFERENCE`, `MATCHTRANSACTIONDATE`). Choosing another record changes one account, but editing a record silently shifts matching for every account that selects it (`FIN_MATCHING_ALGORITHM_ID`). In the F&B International Group sample, two bank accounts share one record (`referencedata/sampledata/F_B_International_Group/FIN_FINANCIAL_ACCOUNT.xml`).
-- A different rule set can be plugged in through the `FIN_MatchingAlgorithm` interface without changing the flow (limits in Section 3.1).
-- Left unset, a record's switches default to name and reference on, date off, though the window starts new records with all three on; the F&B International Group sample `Standard` record (`referencedata/sampledata/F_B_International_Group/FIN_MATCHING_ALGORITHM.xml`) turns all three off, so pass 3 makes any same-amount candidate a strong match and pass 4 can find nothing pass 3 missed. The module's own `Standard` record (`modules/org.openbravo.advpaymentmngt/referencedata/standard/Standard_Algorithm.xml`) sets no switch values, so the values it receives when loaded are not determinable from code.
+- Each financial account can select one matching algorithm record (`FIN_MATCHING_ALGORITHM_ID`), kept in the `Matching Algorithm` window (`FIN_MATCHING_ALGORITHM`) with the rules program and three switches (table below). Choosing another record changes one account, but editing a record silently shifts matching for every account selecting it; in the F&B International Group sample, two bank accounts share one (`referencedata/sampledata/F_B_International_Group/FIN_FINANCIAL_ACCOUNT.xml`).
+- Another rule set can plug in through the interface (`FIN_MatchingAlgorithm`) without changing the flow (Section 3.1).
+- New records, from the window or a dataset such as the module's own `Standard` record (which sets no switch), take the application's switch defaults (`AD_COLUMN`, `DataImportService`, `modules/org.openbravo.advpaymentmngt/referencedata/standard/Standard_Algorithm.xml`); the database's apply only to rows inserted directly (`FIN_MATCHING_ALGORITHM`), and reloading a dataset keeps an existing record's switches. The F&B sample `Standard` record (`referencedata/sampledata/F_B_International_Group/FIN_MATCHING_ALGORITHM.xml`) turns all three off, so pass 3 makes any same-amount candidate a strong match and pass 4 can find nothing pass 3 missed.
 - **Unconfirmed:** which record each account selects and that record's switches, because both are configuration data that can be edited at any time (consulted `FIN_FINANCIAL_ACCOUNT`, `FIN_MATCHING_ALGORITHM`, `StandardMatchingAlgorithm`).
 
-Every setting the matching code reads (`StandardMatchingAlgorithm`, `MatchStatementOnLoadActionHandler`):
+Every setting read by matching and its screens (`StandardMatchingAlgorithm`, `MatchStatementOnLoadActionHandler`):
 
 | Parameter | Default behaviour | How an admin changes it | Limit or failure scenario, for example |
 |-----------|-------------------|-------------------------|----------------------------------------|
-| Account's matching algorithm record (`FIN_MATCHING_ALGORITHM_ID`) | Empty: optional, no default, shown only for bank accounts; without it the account offers Reconcile instead (Section 1.3) | `Matching Algorithm` field of the `Financial Account` window | A new bank account saved without one never offers automatic matching, so its statements are reconciled by ticking |
-| Program name (`CLASSNAME`) | Mandatory, with no default; every shipped record names the standard rules (`StandardMatchingAlgorithm`) | `Java Class Name` field in the `Matching Algorithm` window | A mistyped name, or one from a module not installed, stops automatic matching and every unmatch for each account sharing the record (`NoAlgorithmFoundException`); a valid new name also changes how earlier automatic links are undone, since unmatching always asks the account's current record (`APRM_MatchingUtility`) |
-| Name switch (`MATCHBPNAME`) | On under both defaults; off in the F&B sample record | `Match BP Name` check box, for every sharing account | Off, two customers' same-amount payments can be swapped as strong matches; on, a sender name spelt differently sends the line to weak matching |
-| Reference switch (`MATCHREFERENCE`) | On under both defaults; off in the F&B sample record | `Match Reference` check box | On, a bank reference that is not the payment's reference or number misses strong matching; off, an exact reference no longer beats another payment of the same amount |
-| Date switch (`MATCHTRANSACTIONDATE`) | Off by database default, on for records created in the window, off in the F&B sample record | `Match Transaction Date` check box | On, a one-day gap blocks both pass 3 and pass 4; off, a payment dated months away from the line can be linked |
-| Automatic deposit or withdrawal on the account's payment method (`AUTOMATIC_DEPOSIT`, `AUTOMATIC_WITHDRAWN`) | Off: processing a payment creates no transaction unless the user picks the action that also deposits or withdraws (`FIN_PaymentProcess`, `FIN_Utility`) | `Automatic Deposit` and `Automatic Withdrawn` on the `Payment Method` tab | A customer receipt processed without a deposit leaves no candidate for its bank line until someone records the deposit |
-| Grid-save notice (`APRM_NoPersistInfoMessageInMatching`) | Shown at every opening, warning that every change is saved at once (`APRM_GRID_PERSIST_MESSAGE`) | Each user can hide it with the never-show link (`OBUIAPP_NeverShowMessageAgain`), a personal preference read by `MatchStatementOnLoadGetPreferenceActionHandler`; deleting it in the `Preference` window restores it | Once hidden, nothing on screen reminds the user that a wrong link is saved immediately |
+| Account's matching algorithm record (`FIN_MATCHING_ALGORITHM_ID`) | Empty: optional, no default, shown only for bank accounts (Section 1.3) | `Matching Algorithm` field of the `Financial Account` window | A new bank account saved without one never offers automatic matching, so its statements are reconciled by ticking |
+| Program name (`CLASSNAME`) | Mandatory, with no default; every shipped record names the standard rules (`StandardMatchingAlgorithm`) | `Java Class Name` field in the `Matching Algorithm` window | A mistyped name, or one from a module not installed, stops automatic matching and every unmatch for every sharing account (`NoAlgorithmFoundException`); a valid new name also changes how earlier automatic links are undone, since unmatching always asks the account's current record (`APRM_MatchingUtility`) |
+| Name switch (`MATCHBPNAME`) | On by application and database default | `Match BP Name` check box | Off, two customers' same-amount payments can be swapped as strong matches; on, see Section 3.1 |
+| Reference switch (`MATCHREFERENCE`) | On by application and database default | `Match Reference` check box | Off, an exact reference no longer beats another payment of the same amount; on, see Section 3.1 |
+| Date switch (`MATCHTRANSACTIONDATE`) | On by application default, off by database default | `Match Transaction Date` check box | Off, a payment dated months away from the line can be linked; on, see Section 3.1 |
+| Automatic deposit or withdrawal on the account's payment method (`AUTOMATIC_DEPOSIT`, `AUTOMATIC_WITHDRAWN`) | Off: processing a payment creates no transaction unless the user picks the action that also deposits or withdraws (`FIN_PaymentProcess`, `FIN_Utility`) | `Automatic Deposit` and `Automatic Withdrawn` on the `Payment Method` tab | A customer receipt processed without a deposit leaves its bank line no candidate until the deposit is recorded |
+| Partial-match question (`APRM_MATCHSTATEMENT_HIDE_PARTIALMATCH_POPUP`) | Asked when the chosen transactions do not total the line (`APRM_SplitBankStatementLineConfirm`), unless this preference is Y | Y in the `Preference` window, for one window or all (Section 2.1) | Y skips the question, not the split: a 90.00 payment picked for a 100.00 line leaves a 10.00 remainder line unannounced |
+| Grid-save notice (`APRM_NoPersistInfoMessageInMatching`) | Shown at every opening (`APRM_GRID_PERSIST_MESSAGE`) | Each user can hide it with the never-show link (`OBUIAPP_NeverShowMessageAgain`), a personal preference read by `MatchStatementOnLoadGetPreferenceActionHandler`; deleting it in the `Preference` window restores it | Once hidden, nothing on screen reminds the user that a wrong link is saved immediately |
 
 ### 3.3 Limits
 
-- No amount or date tolerance (allowed difference) in `MatchTransactionDao`, so a one-cent difference, or one day in an exact-date pass, leaves the line for manual work.
-- With the name switch (`MATCHBPNAME`) on, any spelling difference between partner names sends the line to pass 4.
-- The first candidate wins (`StandardMatchingAlgorithm`), with no scoring between same-amount candidates, so a plausible but wrong link can be made. No setting changes this, and the searches set no order, so which one wins is not determinable from code (`MatchTransactionDao`); for example, two open payments of 100.00 can each be linked to the other's line.
-- Automatic matching links one line to one transaction; linking it to several needs a manual search or add that splits it (`APRM_MatchingUtility`). For example, one deposit covering three customer cheques is never matched automatically unless one transaction holds the total.
-- Automatic matching runs only when a user opens `Match Statement` and accepts the prompt (`APRM_AlgorithmConfirm`), which no setting removes, so lines wait for a person; for example, a user declining it to reach the grid sooner may hand-resolve lines the rules would have matched. Nothing signals that an imported statement is waiting (Section 4.3).
-- Weak matches are applied with no confirmation step and only the Affinity column as a cue, so wrong links surface only on review (`MatchStatementOnLoadActionHandler`); the closing message counts matched lines without separating weak ones (`APRM_AutomaticMatchedLines`).
-- Every grid change is saved at once (`APRM_GRID_PERSIST_MESSAGE`), so changes cannot be undone together, and the automatic run saves line by line, so its wrong links cannot be rolled back in one step (`MatchStatementOnLoadActionHandler`).
+- No amount or date tolerance (allowed difference) in `MatchTransactionDao` (exact-amount and exact-date criteria, Section 3.1).
+- With the name switch (`MATCHBPNAME`) on, pass 3 needs identical partner names (partner-name criterion, Section 3.1).
+- The first candidate wins (`StandardMatchingAlgorithm`), with no scoring between same-amount candidates, so a plausible but wrong link can be made. No setting changes this, and the searches set no order, so the winner is not determinable from code (`MatchTransactionDao`); for example, two open payments of 100.00 can each be linked to the other's line.
+- Automatic matching links one line to one transaction; linking it to several needs a manual search or add that splits it (`APRM_MatchingUtility`). For example, one deposit covering three customer cheques is never matched automatically unless one transaction holds the total (`StandardMatchingAlgorithm`).
+- Automatic matching runs only when a user opens `Match Statement` and accepts the prompt (`APRM_AlgorithmConfirm`), which no setting removes, so lines wait for a person; for example, a user declining it to reach the grid sooner may hand-resolve lines the rules would have matched. Nothing signals a waiting statement either (Section 4.3).
+- Weak matches are applied unconfirmed, with only the Affinity column as a cue, so wrong links surface only on review (`MatchStatementOnLoadActionHandler`); the closing message counts matched lines without separating weak ones (`APRM_AutomaticMatchedLines`).
+- Every grid change and every automatic link is saved at once (`APRM_GRID_PERSIST_MESSAGE`, `MatchStatementOnLoadActionHandler`), so neither a session's changes nor a run's wrong links can be undone in one step.
 
-**Requirement implications:** A workbench must show which record and switches produced each automatic link and let people confirm weak matches, because one shared setting changes matching for many accounts (Section 3.2) and weak links are saved unconfirmed (Section 3.3).
+**Requirement implications:** A workbench must show the shared record and switches behind each automatic link and let people confirm weak matches, which are saved unconfirmed (Sections 3.2 and 3.3).
 
 ## 4. Current Handling of Unmatched and Exception Items
 
-**What this section tells you:** This section follows each kind of exception the code distinguishes, from detection to resolution. Each is found on one account's screens and cleared by a person acting on one line or document, and none records the owner, age or reason code the objective asks for.
+**What this section tells you:** This section traces each exception type from detection to resolution (Section 4.4, Appendix C). A person clears each by hand; none records an owner, age or reason code (Section 4.3).
 
 ### 4.1 What Counts as Unmatched
 
-An unmatched item is a line of a processed statement with no linked transaction (`FIN_FINACC_TRANSACTION_ID` empty, `MatchTransactionDao`). Lines of an unprocessed statement, such as one held back by the date check (Section 4.4), do not count: matching, the grid and the printout read processed statements only (`APRM_MatchingUtility`, `aprm_matchstatement`). Automatic matching treats an error on a line as no match, so a line the rules could not evaluate looks rejected (`MatchStatementOnLoadActionHandler`).
-
-Such lines show in three places, none across accounts (`FIN_FINANCIAL_ACCOUNT_ID`) or giving age, owner or cause, so no one sees the whole backlog:
-
-- the Match Statement grid (`aprm_matchstatement`), as described in Section 1.2, step 8;
-- the `Bank Statement Lines` tab: all lines of one statement, with no unmatched-only filter;
-- the unreconciled-lines part of the reconciliation printout (`ReportReconciliation`): lines dated up to the end date that it did not clear (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_reports/UnreconciledBankStatement.jrxml`), a printed snapshot rather than a worklist.
+An unmatched item is a processed statement's line with no linked transaction (`FIN_FINACC_TRANSACTION_ID` empty, `MatchTransactionDao`); a matching error counts as no match, so the line looks rejected (`MatchStatementOnLoadActionHandler`). Lines of unprocessed statements, such as one held by the date check (Section 4.4), do not count: matching, the grid and the printout read only processed ones (`APRM_MatchingUtility`, `aprm_matchstatement`). Unmatched lines show in the Match Statement grid (Section 1.2, step 8), the `Bank Statement Lines` tab (one statement's lines, no unmatched-only filter) and the reconciliation printout's unreconciled-lines part (`ReportReconciliation`), a snapshot of uncleared lines up to the end date, not a worklist (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_reports/UnreconciledBankStatement.jrxml`). None spans accounts (`FIN_FINANCIAL_ACCOUNT_ID`) or gives age, owner or cause, so no one sees the whole backlog.
 
 ### 4.2 How Exceptions Are Resolved
 
@@ -477,40 +481,40 @@ Apart from a later automatic run, each resolution starts from one row of the Mat
 
 ### 4.3 What Is Not Recorded
 
-- `FIN_BANKSTATEMENTLINE` has no owner, reason code, exception status or due date (gap levels in Section 6); age can only be derived from the line's transaction date (`DATETRX`) or entry date (`CREATED`), and its only general-purpose note field is `DESCRIPTION`. Free text cannot be counted by cause, so it cannot stand in for a reason code.
+- `FIN_BANKSTATEMENTLINE` has no owner, reason code, exception status or due date (gap levels in Section 6); age can only be derived from the line's transaction date (`DATETRX`) or entry date (`CREATED`). Its only general-purpose note field, `DESCRIPTION`, holds free text, which cannot be counted by cause and so cannot stand in for a reason code.
 - `CREATEDBY` and `UPDATEDBY` record who entered and last changed a line, so after resolution they show who acted, never who was responsible while it was open (`FIN_BANKSTATEMENTLINE`). Record notes (free-text comments attachable to any record, `OBUIAPP_NOTE`) are the only other place for a cause, and the reconciliation module never reads them (`modules/org.openbravo.advpaymentmngt`).
 - No active alert (a system-generated to-do message sent to a user or role) watches statement lines; the one shipped statement rule, "Old not processed Bank Statements", is inactive and reads the older `C_BANKSTATEMENT` table. It flags unprocessed statements over ten days old, so alerts can already express an age limit (`src-db/database/sourcedata/referencedData/AD_ALERTRULE.xml`).
-- Checks stop work rather than queue it: each blocking check in Section 4.4 shows one message to the person who acted and keeps no record a user can see (`FIN_BankStatementProcess`, `FIN_ReconciliationProcess`).
+- Checks stop work rather than queue it: each in Section 4.4 and Appendix C shows at most one message to whoever acted and keeps no visible record, so blocked time cannot be measured within cycle time (`FIN_BankStatementProcess`, `FIN_ReconciliationProcess`).
 
 ### 4.4 Exception Types from Detection to Resolution
 
-Owner today is the Finance role wherever the work happens in the `Financial Account` window, which `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml` grants it; no type records a person (Section 4.3). Age is never shown; that column names the date it could be derived from.
+No type records an owner (Section 4.3): "Finance, assumed" names Section 2's assumed operator; actual responsibility is not determinable from code (Section 7).
 
-| Exception type | How it is detected and where it is seen | How it is resolved today | Owner today | Age captured | Reason code captured | Missing against the objective |
-|----------------|------------------------------------------|--------------------------|-------------|--------------|----------------------|-------------------------------|
-| Line left unmatched | No candidate passes the rules (Section 3.1), the run is declined, or a rule error counts as no match (Section 4.1); seen in the places in Section 4.1 | Search and link, or add a transaction (Section 4.2); otherwise carried forward | Finance role | No; derivable from `DATETRX` or `CREATED` | No; only free-text `DESCRIPTION` | Owner, age and reason code; the line is not "matched without human touch" |
-| Wrong automatic match, weak (`AP`) or strong (`AU`) | Only the Affinity column hints at it (Section 3.3), and a wrong strong match looks right (`FIN_MatchedTransaction`); found only on review | Unmatch, then search or add; failed unmatches are listed once, by reference number (`APRM_ErrorOnUnmatchingRecords`) | Finance role; no reviewer recorded | No | No; unmatching clears `MATCHINGTYPE` and stores no cause | Reason code, so wrong-match causes cannot be counted or fed back into the rules |
-| Amount difference resolved by split | Matching needs an exact amount (Section 3.3), so only a person's search finds a transaction covering part of the line (`FindTransactionsToMatchActionHandler`) | Linking splits off a new unmatched remainder; unmatching merges it back (`APRM_MatchingUtility`) | Finance role; the remainder has no owner | No; the remainder keeps the original `DATETRX` | No; nothing says whether the gap was a fee, a partial payment or an error | Reason code for the difference; an owner for the remainder |
-| Missing transaction: bank fee, GL item or payment | A search finds nothing because none exists; the standard rules never create one (`StandardMatchingAlgorithm`) | Add Transaction creates and links one with match level `AD` (`AddTransactionActionHandler`) | Finance role | No; derivable from `DATETRX` | Partly, after resolution: the transaction's type and GL item (`C_GLITEM`) say what the line was, not why it lacked one | Reason code while open; such a line always needs a person |
-| Carried-forward line | Reconcile completes with the line unmatched (Section 4.2, `FIN_ReconciliationProcess`) | Reappears in the next draft's grid and the completed reconciliation's printout; resolved like a line left unmatched, later or never | Finance role | No; derivable from `DATETRX`, and nothing marks the line as older | No | Age, owner and reason code; with no due date (Section 4.3), nothing bounds cycle time |
-| Line changed by someone else | Search, add and unmatch refuse if the line changed since the grid loaded (`APRM_StaleDate`, `CheckRecordChangedActionHandler`) | Refresh the grid and retry | Finance role; nothing assigns a line to one person | No | No | Owner: two people on one account learn of each other only through a refusal |
-| Cleared item in a closed accounting period | For organizations set up for accounting, Reconcile, reactivation and manual reconciliation stop, naming the item, when a cleared transaction's accounting date falls in a period not open in `C_PERIODCONTROL` (`APRM_PeriodNotAvailableClearedItem`, `FIN_ReconciliationProcess`, `Reconciliation`) | Reopen the period in the Open/Close Period Control window, or unmatch the item | Not determinable from code: no standard role in the role dataset holds the period window | No; the block is not stored | No | An owner; the draft waits untracked, hiding cycle time |
-| Statement dates out of order | Processing lists each line failing the date rule (Section 1.2, step 4) and leaves the statement unprocessed (`APRM_BankStatementLineWrongDateWarning`, `FIN_BankStatementProcess`) | Correct the dates in `Bank Statement Lines` and process again, or force-process (`EM_APRM_PROCESS_BS_FORCE`, a second button that skips the check) | Finance role | No; derivable from the statement's `IMPORTDATE` | No | Owner and age: its lines appear in no unmatched list (Section 4.1), and the only age rule for unprocessed statements is inactive (Section 4.3) |
-| Manual and statement reconciliation mixed | Opening Match Statement on a draft holding hand-ticked transactions clears those ticks, noting it only in the server log (a technical record users do not see), and raises `APRM_ReconciliationMixed` if that fails (`APRM_MatchingUtility`); manual reconciliation refuses a draft holding statement lines (`Reconciliation`) | Finish the open draft in one mode first | Finance role | No | No; the repair leaves no record a user can see | Owner and reason code: work done by hand is reversed without notice |
-| Split after posting | Linking a transaction of a different amount stops once the reconciliation is posted (`APRM_SplitBSLReconciliationPosted`, `APRM_MatchingUtility`) | Link an exact-amount transaction, or first unpost with the `Posted` button (`ResetAccounting`) | Finance role | No | No | Reason code and cycle time: the line waits with no record of why |
-| Reactivation limits | Reopening a statement stops if it is posted (`PostedDocument`) or holds a matched line (`APRM_BSLineReconciled`, `FIN_BankStatementProcess`); reopening a reconciliation stops if it is posted, a later one exists (`APRM_FutureReconciliationExists`) or another draft is open (`APRM_DraftReconciliationExists`, `FIN_ReconciliationProcess`) | Force processing skips the matched-line check unless the statement is posted; `Reconciliation Process Force` skips only the later-reconciliation check; otherwise unpost, finish the draft, or reactivate and delete later reconciliations | Finance role | No | No | Owner and cycle time: correcting a completed period takes a chain of unassigned manual steps |
+| Exception type | Detected and seen | Resolved today | Owner today | Age and reason captured; gap |
+|----------------|-------------------|----------------|-------------|------------------------------|
+| Line left unmatched | No candidate, a declined run, or a rule error (Sections 3.1, 4.1) | Search and link, add, or carry forward (Section 4.2) | Finance, assumed | Age derivable, reason free text only (Section 4.3); not "matched without human touch" |
+| Wrong automatic match (`AP`, `AU`) | Only on review (Sections 3.3, 5) | Unmatch, then search or add; failures listed once by reference (`APRM_ErrorOnUnmatchingRecords`) | Finance, assumed; no reviewer recorded | Neither: unmatching clears `MATCHINGTYPE`, so causes cannot be counted or fed back into the rules |
+| Amount difference resolved by split | Only by a person's search, amounts being exact (Section 3.3, `FindTransactionsToMatchActionHandler`) | Split and merge (Section 4.2) | Finance, assumed; remainder unowned | Remainder keeps the original `DATETRX`; fee, partial payment or error is never said |
+| Missing transaction: fee, GL item or payment | Search finds none; the standard rules never create one (`StandardMatchingAlgorithm`) | Add Transaction, level `AD` (Section 4.2) | Finance, assumed | Age derivable (`DATETRX`); after resolution, type and GL item (`C_GLITEM`) say what, not why |
+| Carried-forward line | Reconcile completes with it unmatched (Section 4.2, `FIN_ReconciliationProcess`) | As a line left unmatched, later or never | Finance, assumed | Age derivable (`DATETRX`) but unmarked, no reason; with no due date (Section 4.3), nothing bounds cycle time |
+| Line changed by someone else | `APRM_StaleDate`: search and add check only before their pop-up opens (`CheckRecordChangedActionHandler`), unmatch on submission (`UnMatchTransactionActionHandler`), so a change during an open pop-up goes uncaught | Refresh and retry | Finance, assumed; lines unassigned | Neither: colleagues learn of each other by refusal, if at all |
+| Cleared item in a closed accounting period | Reconcile and reactivation stop, naming the item, if its accounting date (`DATEACCT`) is in a period not open (`C_PERIODCONTROL`, `APRM_PeriodNotAvailableClearedItem`) for organizations with accounting (`FIN_ReconciliationProcess`); manual checks differ (Appendix C) | Draft: unmatch the item or reopen the period (Open/Close Period Control window); completed: reactivate only after reopening | Not determinable from code: no standard role holds the period window | Neither: the unstored block hides the wait in cycle time |
+| Statement dates out of order | Statement left unprocessed, failing lines listed (Section 1.2, `APRM_BankStatementLineWrongDateWarning`) | Correct the dates and reprocess, or force-process (Section 2) | Finance, assumed | Age derivable (`IMPORTDATE`), no reason; lines are in no unmatched list (Section 4.1), and the one age rule is inactive (Section 4.3) |
+| Manual and statement reconciliation mixed | Match Statement clears a draft's hand ticks, telling only the server log (a technical record users do not see), or fails (`APRM_ReconciliationMixed`, `APRM_MatchingUtility`); manual reconciliation refuses a draft with statement lines (`Reconciliation`) | Finish the draft in one mode | Finance, assumed | Neither: hand work is reversed unannounced |
+| Split after posting | Blocked once the reconciliation is posted (Section 4.2) | Link an exact amount, or unpost first (`ResetAccounting`) | Finance, assumed | Neither: the line waits unexplained |
+| Reactivation limits | Processed statements, lines and reconciliations refuse key-field edits, insertion and deletion (`20501`); reopening is refused if posted, if a statement has a matched line (`APRM_BSLineReconciled`), or if a later reconciliation (`APRM_FutureReconciliationExists`) or another draft exists (`APRM_DraftReconciliationExists`) | Reopen first: force-reactivation skips only the matched-line or later-reconciliation check; else unpost, finish the draft or delete later reconciliations (Section 2) | Finance, assumed | Neither: correcting a completed period is a chain of unassigned steps |
 
-The checks in the last six rows leave no trace, so time spent blocked cannot be measured within cycle time. Appendix C lists five further messages that interrupt the same work.
-
-Figure 9 follows one line to its two outcomes: reconciled, or carried forward unmarked.
+Figure 9 traces one line to reconciliation or unmarked carry-forward.
 
 **Figure 9. Lifecycle of an Unmatched Statement Line**
 
 ```mermaid
 flowchart TD
+    accTitle: Figure 9. Lifecycle of an Unmatched Statement Line
+    accDescr: A line moves from processing to reconciliation or carry-forward.
     A["Statement processed (FIN_BankStatementProcess)"] --> B{"Matching accepted and a candidate found? (StandardMatchingAlgorithm)"}
-    B -->|"Yes, strong or weak"| L["Line linked (FIN_FINACC_TRANSACTION)"]
-    B -->|"No, declined, or rules failed"| U["Line unmatched, no owner or reason (FIN_BANKSTATEMENTLINE)"]
+    B -->|"Yes, strong or weak, and saved"| L["Line linked (FIN_FINACC_TRANSACTION)"]
+    B -->|"No, declined, rules failed or save failed"| U["Line unmatched, no owner or reason (FIN_BANKSTATEMENTLINE)"]
     U --> G["Waits in one account's grid (MatchStatementTransformer)"]
     G -->|"Search finds one"| S["Search and link, split if amounts differ (FindTransactionsToMatchActionHandler)"]
     G -->|"None exists"| D["Add a fee, GL item or payment (AddTransactionActionHandler)"]
@@ -527,7 +531,7 @@ flowchart TD
     F --> G
 ```
 
-**How to read this:** Follow one line from the top: boxes are steps, diamonds decisions, and every arrow back into "Line unmatched" is another manual pass over it.
+**How to read this:** Boxes are steps, diamonds decisions; each arrow back into "Line unmatched" is another manual pass.
 
 **Requirement implications:** A workbench must give every exception type in Section 4.4 an assignee, a visible age and a coded reason across all accounts, and turn each blocked action into an owned item rather than a message shown once.
 
@@ -596,9 +600,9 @@ Support levels: Full, the code delivers and records the element; Partial, only p
 | Which bank file formats are installed | Not determinable from code: formats are separate modules (Unconfirmed, Section 1.2) | `FIN_BankStatementImport` | Section 1.2 |
 | How files reach users, including bank-side delivery and connectivity | Not determinable from code: import accepts only an uploaded file | `ImportBankFile` | Section 1.2 |
 | Whether posting produces entries, and whether and how often it is scheduled | Not determinable from code: both depend on each installation's setup (two Unconfirmed findings, Section 1.2) | `DocFINReconciliation`, `AcctServerProcess` | Section 1.2 |
-| Which record each account selects, with its switches, and what values the module's own Standard record receives | Not determinable from code: configuration data (Unconfirmed, Section 3.2), and that record sets none | `FIN_MATCHING_ALGORITHM_ID`, `modules/org.openbravo.advpaymentmngt/referencedata/standard/Standard_Algorithm.xml` | Section 3.2 |
+| Which record each account selects, with its switches | Not determinable from code: configuration data (Unconfirmed, Section 3.2) | `FIN_MATCHING_ALGORITHM_ID`, `FIN_MATCHING_ALGORITHM` | Section 3.2 |
 | Which of several same-amount candidates wins | Not determinable from code: the searches set no order | `MatchTransactionDao` | Section 3.3 |
-| Who holds the Finance role, and who may reopen a closed period | Not determinable from code: role assignments are installation data (Unconfirmed and Assumption, Section 2), and no standard role holds the period window | `AD_USER_ROLES`, `C_PERIODCONTROL` | Sections 2 and 4.4 |
+| Who holds the Finance role, who may reopen a closed period, and who answers for each open item or blocked check | Not determinable from code: role assignments are installation data (Unconfirmed and Assumption, Section 2), no standard role holds the period window, and nothing records an owner | `AD_USER_ROLES`, `C_PERIODCONTROL` | Sections 2 and 4.4 |
 
 **Requirement implications:** Targets and measures for the workbench must come from a live installation, and the workbench should record the match, age and timing data the code cannot report today (Section 6).
 
@@ -612,7 +616,6 @@ Each technical term as defined at its first use.
 | Affinity column | the grid's match-strength code |
 | Age | how long an unmatched item has been open |
 | Alert | a system-generated to-do message sent to a user or role |
-| Application Dictionary | the metadata that defines screens, tables and processes |
 | Auto-match rate | the share of statement lines matched with no person acting |
 | Background process | a job the system runs on a schedule without a user |
 | Bank file format | one bank's file layout |
@@ -670,14 +673,16 @@ Supports Section 2.1: flow buttons and checks with no row of their own, and why.
 - Hidden columns `EM_APRM_ADDTRANSACTIONPD` and `EM_APRM_FINDTRANSACTIONSPD` only hold the process definitions of the search and add actions (Section 2.1, rows 21 and 23 to 25), and `EM_APRM_PROCESS_RECONCILIATION` is never shown.
 - The stale-line check (`CheckRecordChangedActionHandler`) has no row because it only refuses an action on a line someone else changed; Section 4.4 traces it.
 
-## Appendix C. Further Messages That Interrupt Exception Work
+## Appendix C. Further Checks That Interrupt Exception Work
 
-Supports Section 4.4: messages beyond those cited there that interrupt the same work (`modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_MESSAGE.xml`).
+Supports Section 4.4, in its columns (`modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_MESSAGE.xml`).
 
-| Message | What the user is told | Shown by |
-|---------|-----------------------|----------|
-| `APRM_SplitBSLAlreadyMatched` | The line cannot be split because it is already matched | `APRM_MatchingUtility` |
-| `APRM_BSTLine_Matched` | A matched line can be neither changed nor deleted | `APRM_FIN_BNKSTM_LINE_CHECK_TRG` |
-| `APRM_ReconciliationDiscrepancy` | In manual reconciliation, the ticked transactions leave a difference with the statement | `Reconciliation` |
-| `APRM_ReconcileInFutureOrPast` | A manual reconciliation cannot predate the last one or be dated in the future | `Reconciliation` |
-| `PeriodNotAvailable` | A manual reconciliation's statement date falls in a closed period | `Reconciliation` |
+| Check | Detected and seen | Resolved today | Owner today | Age and reason captured; gap |
+|-------|-------------------|----------------|-------------|------------------------------|
+| Matched line edited or deleted | Deletion, or a change to date, amounts, reference, partner name text (`BPARTNERNAME`), line number, statement, organization or active flag while matched, is refused (`APRM_BSTLine_Matched`, `APRM_FIN_BNKSTM_LINE_CHECK_TRG`); description, GL item and partner link stay editable. Processed statements refuse these first (`20501`), so it surfaces after force-reactivation. Splitting it is refused too (`APRM_SplitBSLAlreadyMatched`, `APRM_MatchingUtility`), a safeguard the screens never reach | Unmatch, then edit or split | Finance, assumed | Neither: why the line needed correcting is lost |
+| Manual reconciliation out of balance | Refused while the difference, less any GL-item difference entered, is not zero (`APRM_ReconciliationDiscrepancy`, `Reconciliation`); any manual refusal closes the screen with the message on the tab, keeping the draft's date and balance | Tick or untick, correct the ending balance, or enter the difference, booked to the account's difference GL item (`EM_APRM_GLITEM_DIFF`) | Finance, assumed | Neither: the booking never says why |
+| Manual reconciliation date out of range | Dates before the last completed reconciliation's end date, or after tomorrow, are refused; tomorrow passes (`APRM_ReconcileInFutureOrPast`) | Enter a date in range | Finance, assumed | Neither: the block is unrecorded |
+| Manual reconciliation in a closed period | Only if posting is configured for a ticked transaction and the organization has accounting: the statement date (`PeriodNotAvailable`), then each ticked transaction's date (`STATEMENTDATE`, `APRM_PeriodNotAvailableClearedItem`), must be in an open period | Pick another date, untick the item, or reopen the period | Not determinable from code (Section 4.4) | Neither: the draft waits |
+| Setup missing | With no reconciliation numbering, Match Statement (`APRM_NoDocTypeRec`, `APRM_NoDocNumberDocType`) and manual reconciliation (`APRM_DocumentTypeNotFound`) create no draft; import saves nothing without a format (`APRM_NoBankFileAvailableInfo`) or after a Section 1.2 failure; program name: Section 3.2 | Set numbering in `Document Type`; install a format, fix the program name, document type or file, or hand-enter (Section 2) | Not determinable from code: Company Admin holds `Document Type`, a permission only | Neither: nothing exists to assign or age |
+| Search or add refused | The pop-up stays open, saving nothing, if Find has nothing ticked (`APRM_SELECT_RECORD_ERROR`), Add lacks a payment or GL item (`APRM_INVALID_TRANSACTION`), or the new transaction's period is closed while posting is configured (`PeriodNotAvailable`) or its payment awaits automatic execution (`APRM_AutomaticExecutionProcess`, `FIN_TransactionProcess`) | Complete the entry, reopen the period, or execute the payment first (`Payment In`, `Payment Out`) | Finance, assumed | Neither: the line stays unmatched, unexplained |
+| Unmatch clean-up refused | Deleting an algorithm-created transaction on unmatch (Section 4.2) fails if its payment method has left the account (`APRM_NoPaymentMethod`, `FIN_TransactionProcess`); the transaction stays, reported only to the server log (`APRM_MatchingUtility`) | Add the method back, then reopen and delete it | Finance, assumed | Neither: no one learns a leftover remains |
