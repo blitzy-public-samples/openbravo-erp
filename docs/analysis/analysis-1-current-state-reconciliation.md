@@ -4,7 +4,7 @@
 
 - A bank file reaches posted entries (`FACT_ACCT`) in twelve steps, most started by a person.
 - People act at 40 points; the per-line ones sit in the `Match Statement` screen.
-- The rules (`StandardMatchingAlgorithm`) need exact values, take the first match and wait for a user.
+- The rules (`StandardMatchingAlgorithm`) need exact amounts, take the first match and wait for a user.
 - No unmatched line has an owner, reason code or status, and age is only derivable (`FIN_BANKSTATEMENTLINE`).
 - Per-line resolution is the top effort (`APRM_MatchingUtility`); match rates are not determinable from code.
 
@@ -367,7 +367,7 @@ flowchart LR
 
 ## 3. Existing Matching Logic
 
-**What this section tells you:** The automatic rules link a statement line to a transaction only when the amount and other compared details agree exactly, and the first candidate found wins. A few settings, mostly shared between accounts, decide how strict they are; each criterion, rule set (Section 3.1) and setting (Section 3.2) comes with its default, how an administrator changes it and a failure example.
+**What this section tells you:** The automatic rules link a statement line to a transaction only when the amounts agree exactly, and the first candidate found wins; other details count only where a pass compares them, and a GL-item line accepts an earlier-dated transaction. A few settings, mostly shared between accounts, decide how strict they are; each criterion, rule set (Section 3.1) and setting (Section 3.2) comes with its default, how an administrator changes it and a failure example.
 
 ### 3.1 Criteria and Algorithm
 
@@ -533,58 +533,58 @@ flowchart TD
 
 ## 5. Five Largest Sources of Manual Effort
 
-**What this section tells you:** The five largest sources of manual effort the code creates, ranked. Each gives evidence, who is affected, the part of the objective it blocks and why it ranks above the next, pointing back to Sections 2 to 4.
+**What this section tells you:** This section ranks the five largest sources of manual effort by how many statement lines each can reach (Sections 2 to 4). It separates the work of getting lines matched (items 1, 2 and 5) from correcting and tracking them (items 3 and 4), so readers can test the order against installation data (Section 7).
 
 **Assumption:** the ranking reflects how many statement lines the code lets each source affect, not measured volumes. **Unconfirmed:** actual match rates, line volumes and cycle times, because the repository stores no metrics and they depend on production data (consulted `MatchStatementOnLoadActionHandler`, which only shows the matched count as a message).
 
-1. **Line-by-line resolution of lines the rules never match** — every line the automatic run leaves open needs a person, one line at a time (Section 4.2).
+1. **Line-by-line resolution of lines the rules never match** — each line no later automatic run matches needs a person, one line at a time (Section 4.2).
    - **Evidence:** each search, add or split request carries a single statement line (`FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler`, `APRM_MatchingUtility`). Only unmatching works on a selection (`UnMatchSelectedTransactionsActionHandler`), so the search and add actions of Section 2.1 have no bulk form.
    - **Who is affected:** finance users working the `Match Statement P&E` grid (Section 2), and readers of the reconciliation printout, which lists every line left over (`ReportReconciliation`).
-   - **Business impact:** it blocks "matched without human touch", adding at least one manual action per line (Section 6).
-   - **Why it ranks above the next item:** it reaches every line that ends unmatched for any reason, including a bank fee with no transaction to find (`AddTransactionActionHandler`); item 2's exact-value rules are only one cause feeding it.
+   - **Business impact:** it blocks "matched without human touch", since each such line takes at least one manual action to resolve (Section 6).
+   - **Why it ranks above the next item:** it reaches every line no automatic run matches, whatever the cause, including a bank fee with no transaction to find (`AddTransactionActionHandler`); item 2's exact-value rules are only one cause feeding it.
 2. **Exact-equality rules with no tolerance, where the first candidate wins** — any field that fails the applicable pass's test (Section 3.1) sends the line to weak matching or manual work.
-   - **Evidence:** every comparison the passes make is an exact equality (`MatchTransactionDao`), the first candidate wins with no scoring (`StandardMatchingAlgorithm`), and the only settings are three on/off switches on a shared record (`FIN_MATCHING_ALGORITHM`); Sections 3.2 and 3.3 give the detail.
-   - **Who is affected:** finance users, who receive every rejected line, and editors of the `Matching Algorithm` window, whose switch changes reach every sharing account.
-   - **Business impact:** they cap how many lines are "matched without human touch"; each rejected line feeds item 1, each wrong first pick item 3.
+   - **Evidence:** Sections 3.1 to 3.3 give the criteria, switches and first-candidate choice (`MatchTransactionDao`, `StandardMatchingAlgorithm`, `FIN_MATCHING_ALGORITHM`).
+   - **Who is affected:** finance users, who work the lines the rules reject, and users permitted to edit `Matching Algorithm` (Sections 2.1 and 3.2).
+   - **Business impact:** they cap how many lines are "matched without human touch" (Section 3.1); lines they keep rejecting feed item 1, and wrong first picks feed item 3.
    - **Why it ranks above the next item:** they decide every line in every automatic run (`StandardMatchingAlgorithm`), whereas wrong matches arise only where a same-amount candidate was found.
 3. **Correcting wrong automatic matches** — each wrong link (Section 3.3) must be found and undone by a person (Section 4.2).
-   - **Evidence:** weak matches are saved unconfirmed (Section 3.3, `FIN_MatchedTransaction`), and undoing one is a manual unmatch (`UnMatchSelectedTransactionsActionHandler`) that leaves no record of the error (Section 4.4).
-   - **Who is affected:** finance users, with only the Affinity column to tell weak from strong, and accounting readers, because a wrong link marks the wrong transaction cleared (status `RPPC`) inside the reconciliation (`APRM_MatchingUtility`).
-   - **Business impact:** each wrong match costs a review, an unmatch and a fresh search or add, so matched lines can still need a person; the share of wrong matches is not determinable from code (Section 7).
+   - **Evidence:** Sections 3.3 and 4.4 give the review and correction evidence (`FIN_MatchedTransaction`, `UnMatchSelectedTransactionsActionHandler`).
+   - **Who is affected:** finance users, who must detect and correct wrong links (Sections 3.3 and 4.2), and accounting readers, because a wrong link marks the wrong transaction cleared (`RPPC`, `APRM_MatchingUtility`).
+   - **Business impact:** it adds to the manual effort the objective aims to reduce, because each wrong match costs a review and an unmatch, after which the line waits for a search, an add or a later automatic run (Section 4.2). The share of wrong matches is not determinable from code (Section 7).
    - **Why it ranks above the next item:** it adds actions to lines the rules did match, and any automatic match may need checking because a wrong link looks right (`FIN_MatchedTransaction`); item 4 adds no action per line and bites only on lines still open after items 1 to 3.
 4. **No structured exception tracking** — the gaps in Sections 4.2 and 4.3 leave each unmatched line with no accountable person.
-   - **Evidence:** no field holds an owner, reason code, status or due date (`FIN_BANKSTATEMENTLINE`, Section 4.3), and open lines carry forward unflagged (`FIN_ReconciliationProcess`, Section 4.2).
+   - **Evidence:** Sections 4.2 and 4.3 give the missing tracking fields and the unflagged carry-forward (`FIN_BANKSTATEMENTLINE`, `FIN_ReconciliationProcess`).
    - **Who is affected:** finance users who inherit carried-forward lines, and anyone answerable for the backlog, which no record or active alert assigns (Section 4.3).
    - **Business impact:** "every unmatched item has an owner, age, and reason code" cannot be met (Section 6).
    - **Why it ranks above the next item:** it affects every line still open after a reconciliation and blocks a part of the objective no current action can satisfy (`FIN_BANKSTATEMENTLINE`); item 5 costs one prompt answer per opening and delays lines rather than leaving them untracked.
 5. **Matching only on demand, behind a confirmation prompt** — nothing is matched between import and the next user session (Section 3.3).
-   - **Evidence:** the rules run only when `Match Statement` opens and the user accepts the prompt (`MatchStatementOnLoadActionHandler`, `APRM_AlgorithmConfirm`). Neither the import (`ImportBankFile`) nor statement processing (`FIN_BankStatementProcess`) starts them, and no background process does (Section 3.3).
-   - **Who is affected:** finance users, who must open the screen and answer the prompt per financial account, and everyone waiting on that account's reconciliation (`Match Statement`).
+   - **Evidence:** Section 3.3 gives the matching-start limit (`MatchStatementOnLoadActionHandler`, `APRM_AlgorithmConfirm`); neither import nor processing starts matching (Section 1.2, `ImportBankFile`, `FIN_BankStatementProcess`).
+   - **Who is affected:** finance users working each bank account that uses matching, and people waiting for its reconciliation (`Match Statement`).
    - **Business impact:** waiting time is added to the cycle time the objective aims to cut, and an automatic step still needs a human touch to start (Section 6).
-   - **Why it ranks above the next item:** it outranks the candidates left unranked because it applies to every statement on every account (`MatchStatementOnLoadActionHandler`). Date-order warnings and force processing arise only for statements dated on or before earlier lines (`APRM_BankStatementLineWrongDateWarning`), exclusion words are upkeep per file format (`FIN_BANKFILE_EXCEPTION`), and posting configuration shapes accounting entries, not matching (`DocFINReconciliation`).
+   - **Why it ranks above the next item:** it outranks the candidates left unranked because it applies to every processed statement on each bank account that uses matching (Section 1.1, `MatchStatementOnLoadActionHandler`). Date-order warnings and force processing arise only for statements dated on or before earlier lines (`APRM_BankStatementLineWrongDateWarning`), exclusion words are upkeep per file format (`FIN_BANKFILE_EXCEPTION`), and posting configuration shapes accounting entries, not matching (`DocFINReconciliation`).
 
-**Requirement implications:** The workbench must first cut per-line resolution and widen automatic matching (items 1 and 2), then make automatic matches checkable (item 3), give each open line an owner, age and reason code (item 4), and start matching without waiting for a person (item 5).
+**Requirement implications:** Requirements must cover both preventing manual work and accountable resolution of the exceptions that remain, and delivery priorities should be checked against workload and outcome data before this ranking is treated as a delivery sequence (Section 7).
 
 ## 6. Gaps Against the Objective
 
-**What this section tells you:** How far today's code supports each element of the objective quoted in Section 1.1. Owner and reason code have no support, while the auto-match rate (the share of statement lines matched with no person acting) and age are partly supported.
+**What this section tells you:** This section assesses how far today's code supports each element of the objective quoted in Section 1.1. Owner and reason code have no support, while the auto-match rate (the share of statement lines matched with no person acting) and age are partly supported.
 
 Support levels: Full, the code delivers and records the element; Partial, only part; None, nothing supports it.
 
 | Objective element | Current support (Full/Partial/None) | Evidence | Where detailed |
 |-------------------|-------------------------------------|----------|----------------|
-| Auto-match rate: most statement lines matched without human touch | Partial | The rules match automatically (`StandardMatchingAlgorithm`), but only on exact values and after a person accepts the prompt (`APRM_AlgorithmConfirm`). Each line keeps its match level (`AU`, `AP`, manual `MA` or added `AD`) in `MATCHINGTYPE`, but no screen or report counts the share and the run's count is not stored (`APRM_AutomaticMatchedLines`). The actual rate is not determinable from code. | Sections 3.1, 3.3 and 5 (items 1, 2, 3 and 5) |
-| Owner | None | No owner column on `FIN_BANKSTATEMENTLINE`, and its creation and change stamps cannot stand in for one (Section 4.3); access is granted per role and window (`AD_WINDOW_ACCESS`), never per line. | Sections 4.3, 4.4 and 5 (item 4) |
-| Age | Partial | Derivable from `DATETRX` or `CREATED` (`FIN_BANKSTATEMENTLINE`), and the grid shows the line's date (`aprm_matchstatement`), but nothing states it and carried-forward lines carry no marker (`FIN_ReconciliationProcess`). | Sections 4.1 to 4.4 |
-| Reason code | None | No reason column on `FIN_BANKSTATEMENTLINE`; `MATCHINGTYPE` records how a line was matched, not why one is not, and free text (`DESCRIPTION`, `OBUIAPP_NOTE`) cannot be counted (Section 4.3). | Sections 4.3 and 4.4 |
+| Auto-match rate: most statement lines matched without human touch | Partial | Automatic matching exists (`StandardMatchingAlgorithm`), within the limits of Sections 3.1 and 3.3. Each line keeps its match level (`AU`, `AP`, manual `MA` or added `AD`) in `MATCHINGTYPE`, but no screen or report counts the share and the run's count is not stored (`APRM_AutomaticMatchedLines`). The actual rate is not determinable from code. | Sections 3.1, 3.3 and 5 (items 1, 2, 3 and 5) |
+| Owner | None | No owner field (Section 4.3, `FIN_BANKSTATEMENTLINE`); role grants (`AD_WINDOW_ACCESS`) never assign individual lines. | Sections 4.3, 4.4 and 5 (item 4) |
+| Age | Partial | Derivable from the line's dates, which the grid shows, but never shown as an age (Sections 4.3 and 4.4, `FIN_BANKSTATEMENTLINE`, `aprm_matchstatement`). | Sections 4.1 to 4.4 |
+| Reason code | None | No reason field, and free text cannot be counted (Section 4.3, `FIN_BANKSTATEMENTLINE`, `OBUIAPP_NOTE`); `MATCHINGTYPE` records how a line was matched, not why one is not. | Sections 4.3 and 4.4 |
 | Cycle time | None | No field keeps when a line was matched or a reconciliation completed: `FIN_RECONCILIATION` holds the period end (`DATETO`) and statement date (`STATEMENTDATE`), and its `UPDATED` stamp changes with any edit. Actual cycle times are not determinable from code. | Sections 3.3 and 5 (item 5) |
-| Manual effort | Partial | The automatic run, a search linking several transactions to one line, and unmatching a selection each save actions (`APRM_MatchingUtility`, `UnMatchSelectedTransactionsActionHandler`). Every line the rules miss still needs its own search or add, and only the levels `MA` and `AD` show manual work, so staff time is not determinable from code. | Sections 2 and 5 (items 1 and 3) |
+| Manual effort | Partial | Sections 2.1, 4.2 and 5 (items 1 and 3) give the actions the code already spares users and the per-line work left on lines no automatic run matches, since later runs retry open lines (`APRM_MatchingUtility`, `UnMatchSelectedTransactionsActionHandler`); `MA` and `AD` identify manual matching methods, not time spent, so staff time is not determinable from code. | Sections 2 and 5 (items 1 and 3) |
 
-**Requirement implications:** The workbench must add owner and reason code as new recorded data, turn the derivable age into a shown and tracked value, and measure the auto-match rate and cycle time that the code cannot report today.
+**Requirement implications:** The workbench must record owner and reason code as new data, show and track the derivable age (Section 4.3), and measure the auto-match rate and cycle time the code cannot report today (Section 7).
 
 ## 7. Open Questions
 
-**What this section tells you:** These questions need data the code does not hold: volumes, rates, times and installation setup. None is determinable from code, so no figure is given; labelled Unconfirmed and Assumption findings stay in their sections, cited here by number.
+**What this section tells you:** Code alone cannot establish the workload, operating results or installation settings needed to judge the objective (Section 1.1). These questions identify the operational evidence required before setting targets or validating the ranking and gaps in Sections 5 and 6.
 
 | Question | Why the code cannot answer it | Code consulted | Section it affects |
 |----------|-------------------------------|----------------|--------------------|
