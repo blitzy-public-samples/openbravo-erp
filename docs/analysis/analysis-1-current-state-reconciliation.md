@@ -81,7 +81,7 @@ Candidates are processed, unreconciled transactions of the same account that are
 
 ### 3.3 Limits
 
-- No amount or date tolerance (allowed difference) in `MatchTransactionDao`, so a one-cent difference, or a one-day difference in an exact-date pass, sends the line to weak matching or manual work.
+- No amount or date tolerance (allowed difference) in `MatchTransactionDao`, so a one-cent difference, or a one-day difference in an exact-date pass, leaves the line unmatched for manual work.
 - With the name switch (`MATCHBPNAME`) on, pass 3 needs identical partner names, so spelling differences defeat that strong rule.
 - The first candidate wins (`StandardMatchingAlgorithm`), with no scoring between same-amount candidates, so a plausible but wrong link can be made.
 - Automatic matching links one line to one transaction; linking one line to several needs a manual search or add that splits it (`APRM_MatchingUtility`).
