@@ -92,27 +92,27 @@ Forward, each of F1 to F9 has at least one requirement; backward, every REQ and 
 
 ### 3.1 Conflicts register
 
-Code evidence is a path and line numbers at `master` commit `77692f968d`.
+Code evidence is a file and line numbers at `master` commit `77692f968d`; full paths close Section 3.2.
 
-| ID | What the request or a source says, against what the code or a source shows | Requirements affected | Resolution |
+| ID | What the request or a source says against what the code or a source shows | Requirements affected | Resolution |
 |---|---|---|---|
-| C-01 | The stated paths `docs/analysis/analysis-1-current-state-reconciliation.md`, `docs/analysis/analysis-2-extension-points-and-risks.md` and `blitzy/documentation/Project Guide - e5d40ea1-c3ed-4994-87eb-e962dec9dc66.md` are absent from `master`. They sit on branch `blitzy-e5d40ea1-c3ed-4994-87eb-e962dec9dc66`, read at `68ab20e6bd`; later commits `e26102ab7b` to head `af6933f42b` reword both analyses but keep every heading. | All citations | Cite by stated path and section number, valid at both commits. |
-| C-02 | The request names four elements of Analysis 1, Section 6 and adds cycle time and manual effort, which that section already lists. | Section 6 | Use its six once each. |
-| C-03 | The Project Guide describes earlier analyses, with 8 steps, 17 manual actions and 13 integration areas (Project Guide, Sections 1.1 and 1.3), not today's 12, 55 and 17. U1 to U7 and A-1 to A-3 appear only in Project Guide, Sections 1.4 and 2.1, which agree. | Section 7 | Findings from the analyses, identifiers from the Project Guide; none is missing. |
-| C-04 | The request wants owner aging alerts from new alert rules (saved queries that raise alerts) and one recommended design. Alerts show only to recipient users or roles (`modules/org.openbravo.client.application/src/org/openbravo/client/application/ADAlertDatasourceService.java:99-109`), a filter clause can narrow them to the owner (`modules/org.openbravo.client.application/src/org/openbravo/client/application/ADAlertDatasourceService.java:152-173`), and email reaches every user of each recipient role (`src/org/openbravo/erpCommon/ad_process/AlertProcess.java:343-452`). An alert repeats only once the earlier one is solved, keyed by a 32-character reference (`src/org/openbravo/erpCommon/ad_process/AlertProcess.java:109-111`; `src-db/database/model/tables/AD_ALERT.xml:68`). | REQ-19, NFR-02 | One rule with an owner filter, recipients every role granted the worklist, on screen and without email; one rule per owner is rejected, as each new owner would need a rule, which conflicts with claiming. It raises one alert per owner per organization per day, because Alert Management, the screen listing a user's alerts, hides whole alerts by organization but never a count inside one (`modules/org.openbravo.client.application/src/org/openbravo/client/application/ADAlertDatasourceService.java:165-183`). This departs from "one alert per owner per day" only for owners in several organizations. The key changes daily, so the previous day's alert closes itself (`src/org/openbravo/erpCommon/ad_process/AlertProcess.java:475-484`). |
-| C-05 | Analysis 2, Section 5.1, rank 4 gives Finance one alert per unowned line; the request asks for a daily digest, one alert carrying a count instead of one alert per line. | REQ-20 | One digest per organization, so users see only counts they may read (`modules/org.openbravo.client.application/src/org/openbravo/client/application/ADAlertDatasourceService.java:169-170`). |
+| C-01 | The stated paths `docs/analysis/analysis-1-current-state-reconciliation.md`, `docs/analysis/analysis-2-extension-points-and-risks.md` and `blitzy/documentation/Project Guide - e5d40ea1-c3ed-4994-87eb-e962dec9dc66.md` are absent from `master` and sit on branch `blitzy-e5d40ea1-c3ed-4994-87eb-e962dec9dc66`, read at `68ab20e6bd`; later commits `e26102ab7b` to head `af6933f42b` reword both analyses but keep every heading. | All citations | Cite by stated path and section number, valid at both commits. |
+| C-02 | The request names four Analysis 1, Section 6 elements and adds cycle time and manual effort, which that section already lists. | Section 6 | Use its six once each. |
+| C-03 | The Project Guide describes earlier analyses: 8 steps, 17 manual actions and 13 integration areas (Project Guide, Sections 1.1 and 1.3), not today's 12, 55 and 17. U1 to U7 and A-1 to A-3 appear only in Project Guide, Sections 1.4 and 2.1, which agree. | Section 7 | Findings from the analyses, identifiers from the Project Guide; none is missing. |
+| C-04 | The request wants owner aging alerts from new alert rules (saved queries that raise alerts) and one recommended design. Alerts show only to recipient users or roles (`ADAlertDatasourceService.java:99-109`), a filter clause can narrow them to the owner (`ADAlertDatasourceService.java:152-173`), and email reaches every user of each recipient role (`AlertProcess.java:343-452`). An alert repeats only once the earlier one is solved, keyed by a 32-character reference (`AlertProcess.java:109-111`; `AD_ALERT.xml:68`). | REQ-19, NFR-02 | One rule with an owner filter, recipients every role granted the worklist, on screen, no email; one rule per owner is rejected, as each new owner would need one, conflicting with claiming. It raises one alert per owner per organization per day, because Alert Management, the screen listing a user's alerts, hides whole alerts by organization, never a count inside one (`ADAlertDatasourceService.java:165-183`). This departs from "one alert per owner per day" only for owners in several organizations. The key changes daily, so the previous day's alert closes itself (`AlertProcess.java:475-484`). |
+| C-05 | Analysis 2, Section 5.1, rank 4 gives Finance one alert per unowned line; the request asks for a daily digest, one alert carrying a count instead of one alert per line. | REQ-20 | One digest per organization, so users see only counts they may read (`ADAlertDatasourceService.java:169-170`). |
 | C-06 | Analysis 2, Section 6 puts the confirmation flag in its Phase 5 and measurement in its Phase 4; the request puts F3 and F4 in Phase 1. | REQ-09 to REQ-11 | Follow the request; the flag gains a reader in Phase 2 (REQ-13), and only the stamps wait for the deferred reporting. |
-| C-07 | The request cites Analysis 2, Sections 4 and 6 for every gate, but Analysis 2, Section 6 names gates only for its Phases 1, 3, 5 and 6. | Section 4.3.12 | Draw the Phase 2 gate from the Analysis 2, Section 4.2 mitigations. |
+| C-07 | The request cites Analysis 2, Sections 4 and 6 for every gate; Analysis 2, Section 6 names gates only for its Phases 1, 3, 5 and 6. | Section 4.3.12 | Draw the Phase 2 gate from the Analysis 2, Section 4.2 mitigations. |
 | C-08 | No test clicks through a screen (Analysis 2, Section 4), and the browser test runner covers three utility files (Analysis 2, Section 1.1), so the warning's display has no automated test. | REQ-22 | JUnit, the Java test framework, for the server response; a recorded manual test for the display. |
-| C-09 | Analysis 2, Section 4.2 has no widget row, no test refers to `QueryListDataSource`, and the widget query runs with elevated rights (`modules/org.openbravo.client.querylist/src/org/openbravo/client/querylist/QueryListDataSource.java:164`), so the organization limit must sit in the query, as in shipped widgets (`modules/org.openbravo.client.querylist/src-db/database/sourcedata/OBUIAPP_PARAMETER.xml:188-190`). | REQ-21, NFR-02 | Add a datasource test on the existing harness (`src-test/src/org/openbravo/test/datasource/BaseDataSourceTestDal.java:43`). |
-| C-10 | The request says reactivating an "earlier" reconciliation is refused while a draft reconciliation, an unfinished one, exists; the code refuses any of the account's reconciliations, the latest included, forced or not (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/process/FIN_ReconciliationProcess.java:121-139`). | REQ-25 | The job reuses the draft and creates one only when it links a line; users finish or delete a draft first, as today (Analysis 1, Section 2.1, rows 44 and 51). |
-| C-11 | The request opens a line "in Match Statement", which opens only from a financial account record (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/actionHandler/MatchStatementOnLoadActionHandler.java:59`; `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_FIELD.xml:13477`). With an earlier reconciliation as the open draft, the account shows Match Transactions Force, the variant limited to that period (`modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_FIELD.xml:16298-16304`), listing only lines up to its end date (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/hqlinjections/MatchStatementTransformer.java:74-78`). | REQ-17 | The worklist opens the line's financial account (`modules/org.openbravo.client.application/src/org/openbravo/client/application/process/ResponseActionsBuilder.java:136-185`), one click from Match Statement. A line dated after an earlier open draft's end date stays absent until that draft is completed or deleted (C-10), so not every row is resolvable at once. A direct launch would need new screen code, which Analysis 2, Section 1.2 advises against. |
+| C-09 | Analysis 2, Section 4.2 has no widget row, no test refers to `QueryListDataSource`, and the widget query runs with elevated rights (`QueryListDataSource.java:164`), so the organization limit must sit in the query, as in shipped widgets (`OBUIAPP_PARAMETER.xml:188-190`). | REQ-21, NFR-02 | Add a datasource test on the existing harness (`BaseDataSourceTestDal.java:43`). |
+| C-10 | The request says reactivating an "earlier" reconciliation is refused while a draft reconciliation, an unfinished one, exists; the code refuses any of the account's reconciliations, latest included, forced or not (`FIN_ReconciliationProcess.java:121-139`). | REQ-25 | The job reuses the draft and creates one only when it links a line; users finish or delete a draft first, as today (Analysis 1, Section 2.1, rows 44 and 51). |
+| C-11 | The request opens a line "in Match Statement", which opens only from a financial account record (`MatchStatementOnLoadActionHandler.java:59`; `AD_FIELD.xml:13477`). With an earlier reconciliation as the open draft, the account shows Match Transactions Force, the variant limited to that period (`AD_FIELD.xml:16298-16304`), listing only lines up to its end date (`MatchStatementTransformer.java:74-78`). | REQ-17 | The worklist opens the line's financial account (`ResponseActionsBuilder.java:136-185`), one click from Match Statement. A line dated after an earlier open draft's end date stays absent until that draft is completed or deleted (C-10), so not every row resolves at once. A direct launch would need new screen code, which Analysis 2, Section 1.2 advises against. |
 | C-12 | F1 adds a due date that F5 never shows, and alerts use age. | REQ-04, REQ-13, REQ-15 | Show and edit it on the worklist; no alert uses it. |
 | C-13 | Users set status, yet Resolved is automatic on a match. | REQ-05, REQ-15 | Per the edit policy (Section 4.1.2), users choose Open, Assigned or In Review, and only a match sets Resolved. |
-| C-14 | F3 calls weak matches unconfirmed; the match-level list labels them "Approved" (`src-db/database/sourcedata/AD_REF_LIST.xml:9273-9274`). | REQ-09 | No relabel; the flag reads "Unconfirmed weak match", and the glossary explains the label. |
+| C-14 | F3 calls weak matches unconfirmed; the match-level list labels them "Approved" (`AD_REF_LIST.xml:9273-9274`). | REQ-09 | No relabel; the flag reads "Unconfirmed weak match", and the glossary explains the label. |
 | C-15 | Analysis 2, Section 3 would confirm existing weak matches by backfill; the request backfills status only. | REQ-08, REQ-09 | No flag backfill; the deferred review queue decides older weak matches. |
 | C-16 | Excluded accounts can hold hand-entered processed statements (Analysis 1, Section 2.1, row 13). | REQ-13, REQ-21 | The worklist and counts widget cover only in-scope accounts. |
-| C-17 | F5 lists unmatched lines yet shows the weak-match flag, which only matched lines carry. | REQ-09, REQ-13, REQ-15 | The worklist also lists weak-flagged lines of a draft reconciliation, Resolved and read-only, until completion, as the Match Statement grid lists draft-matched lines (`modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/hqlinjections/MatchStatementTransformer.java:66-67`). Alerts and the counts widget count unmatched lines only. |
+| C-17 | F5 lists unmatched lines yet shows the weak-match flag, which only matched lines carry. | REQ-09, REQ-13, REQ-15 | The worklist also lists weak-flagged lines of a draft reconciliation, Resolved and read-only, until completion, as the Match Statement grid lists draft-matched lines (`MatchStatementTransformer.java:66-67`). Alerts and the counts widget count unmatched lines only. |
 | C-18 | F1 puts the fields on every line and backfills every unmatched processed line, including excluded accounts' hand-entered ones (C-16). | REQ-01, REQ-08; Section 1.3 | Treat F1 as a table-wide data foundation, so an account that later gains a matching algorithm arrives classified; every workbench behaviour (REQ-12 to REQ-25) excludes those accounts. |
 
 ### 3.2 Confirmed as described
@@ -121,26 +121,104 @@ Every other name the request uses exists as described.
 
 | Name in the request | What it is | Confirmed in |
 |---|---|---|
-| `FIN_BANKSTATEMENTLINE` | Statement-line table, with no owner, status, reason, due date or flag column, and none added by modules | `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:2-112` |
-| `DATETRX` | Bank's date for the line, required and copied to a remainder | `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:52`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:806` |
-| `MATCHINGTYPE` | Match level: AU Auto, AP Approved, MA Manual, AD Added, NO None (C-14) | `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:68`; `src-db/database/sourcedata/AD_REF_LIST.xml:9273, 10822, 11763, 12112, 13881` |
-| `DESCRIPTION` | Free text up to 2,000 characters | `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:76` |
-| `AD_USER` | System users | `src-db/database/model/tables/AD_USER.xml:3` |
-| `AD_ALERTRULE` and recipient records | Rules with filter clause and query; recipients by user or role, with an email flag (C-04) | `src-db/database/model/tables/AD_ALERTRULE.xml:40-48`; `src-db/database/model/tables/AD_ALERTRECIPIENT.xml:4, 44, 48`; `src-db/database/model/tables/AD_ALERT.xml:44-68` |
-| `OBCQL_WIDGET_QUERY` | Query/List widget query, granted by role (C-09) | `modules/org.openbravo.client.querylist/src-db/database/model/tables/OBCQL_WIDGET_QUERY.xml:36-47`; `modules/org.openbravo.client.myob/src-db/database/model/tables/OBKMO_WIDGET_CLASS_ACCESS.xml:3` |
-| `MatchStatementOnLoadActionHandler` | Opens Match Statement on one account's draft and matches only on acceptance, showing but not storing the count | `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/actionHandler/MatchStatementOnLoadActionHandler.java:59-98, 117-172` |
-| `APRM_MatchingUtility` | Writes each match and unmatch in one place, unmatch clearing the match level; copies a line before dividing it, deletes parts when rejoining, and reads the browser for messages | `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:283-329, 377-436, 445-496, 801-806, 868-870` |
-| `AlertProcess` | Runs alert rules as process 800170, daily at 23:59 (C-04, C-05) | `src/org/openbravo/erpCommon/ad_process/AlertProcess.java:106-162`; `src-db/database/sourcedata/referencedData/AD_PROCESS_REQUEST.xml:47, 54, 56`; `src/org/openbravo/scheduling/Frequency.java:27` |
-| `OBScheduler` | Starts jobs now or on saved schedules | `src/org/openbravo/scheduling/OBScheduler.java:124, 159` |
-| `Reconciliation` servlet | The older manual Reconciliation screen, completing on its own | `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_actionbutton/Reconciliation.java:74, 357` |
-| `aprm_matchstatement` | HQL-based table behind the Match Statement grid, HQL being the query language that selects the records a list shows | `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_TABLE.xml:218, 230` |
-| Match Statement | A Pick and Execute screen, a pop-up grid where a user selects rows and runs an action on them (C-11); its Reconcile All, the action that completes a reconciliation, returns a plain success message | `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/OBUIAPP_PROCESS.xml:84, 91`; `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_WINDOW.xml:205, 208`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/actionHandler/MatchStatementActionHandler.java:59-66` |
-| Finance role | Standard "Finance" role of the V3 Roles dataset: Financial Account (editable), Import Statement, Reconcile and both reconciliation reports; no alert-recipient or widget grant | `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml:1898-1906`; `modules/org.openbravo.v3.datasets/src-db/database/sourcedata/AD_DATASET.xml:8-13` |
-| `APRM_DraftReconciliationExists` | Refuses reactivation while a draft exists (C-10) | `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_MESSAGE.xml:849-850`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/process/FIN_ReconciliationProcess.java:132-139` |
-| "Old not processed Bank Statements" | Inactive rule `1000010` on the older `c_bankstatement` table, flagging statements unprocessed over 10 days | `src-db/database/sourcedata/referencedData/AD_ALERTRULE.xml:150` |
-| Processing-lock trigger `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Locks only the bank's own fields on processed or matched lines | `modules/org.openbravo.advpaymentmngt/src-db/database/model/triggers/APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:46-56, 63, 67, 72-83` |
-| Pick and Execute | Pattern of Find Transactions to Match and Match Statement | `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/OBUIAPP_PROCESS.xml:14, 91` |
-| Draft reconciliation | Status `DR`, checked before reactivation (C-10); completion stores no time | `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:681`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/process/FIN_ReconciliationProcess.java:99-106, 189-202`; `src-db/database/model/tables/FIN_RECONCILIATION.xml:48-64` |
+| `FIN_BANKSTATEMENTLINE` | Statement-line table, with no owner, status, reason, due date or flag column, even from modules | `FIN_BANKSTATEMENTLINE.xml:2-112` |
+| `DATETRX` | Bank's date for the line, required and copied to a remainder | `FIN_BANKSTATEMENTLINE.xml:52`; `APRM_MatchingUtility.java:806` |
+| `MATCHINGTYPE` | Match level: AU Auto, AP Approved, MA Manual, AD Added, NO None (C-14) | `FIN_BANKSTATEMENTLINE.xml:68`; `AD_REF_LIST.xml:9273, 10822, 11763, 12112, 13881` |
+| `DESCRIPTION` | Free text up to 2,000 characters | `FIN_BANKSTATEMENTLINE.xml:76` |
+| `AD_USER` | System users | `AD_USER.xml:3` |
+| `AD_ALERTRULE` and recipient records | Rules with filter clause and query; recipient records with a required role, optional user and send-email flag (C-04) | `tables/AD_ALERTRULE.xml:40-48`; `AD_ALERTRECIPIENT.xml:4, 44, 48`; `AD_ALERT.xml:44-68` |
+| `OBCQL_WIDGET_QUERY` | Query/List widget query, granted by role (C-09) | `OBCQL_WIDGET_QUERY.xml:36-47`; `OBKMO_WIDGET_CLASS_ACCESS.xml:3` |
+| `MatchStatementOnLoadActionHandler` | Opens Match Statement on one account's draft, matching only on acceptance and showing, not storing, the count | `MatchStatementOnLoadActionHandler.java:59-98, 117-172` |
+| `APRM_MatchingUtility` | Writes each match and unmatch in one place, unmatch clearing the match level; copies a line before dividing it, deletes parts when rejoining, and reads the browser for messages | `APRM_MatchingUtility.java:283-329, 377-436, 445-496, 801-806, 868-870` |
+| `AlertProcess` | Runs alert rules as process 800170, daily at 23:59 (C-04, C-05) | `AlertProcess.java:106-162`; `AD_PROCESS_REQUEST.xml:47, 54, 56`; `Frequency.java:27` |
+| `OBScheduler` | Starts jobs now or on saved schedules | `OBScheduler.java:124, 159` |
+| `Reconciliation` servlet | The older manual Reconciliation screen, completing on its own | `Reconciliation.java:74, 357` |
+| `aprm_matchstatement` | HQL-based table behind the Match Statement grid, HQL being the query language that selects the records a list shows | `sourcedata/AD_TABLE.xml:218, 230` |
+| Match Statement | A Pick and Execute screen, a pop-up grid where a user selects rows and runs an action on them (C-11); its Reconcile All, the action that completes a reconciliation, returns a plain success message | `OBUIAPP_PROCESS.xml:84, 91`; `AD_WINDOW.xml:205, 208`; `MatchStatementActionHandler.java:59-66` |
+| Finance role | Standard "Finance" role of the V3 Roles dataset: Financial Account (editable), Import Statement, Reconcile and both reconciliation reports; no alert-recipient or widget grant | `V3_Roles.xml:1898-1906`; `AD_DATASET.xml:8-13` |
+| `APRM_DraftReconciliationExists` | Refuses reactivation while a draft exists (C-10) | `AD_MESSAGE.xml:849-850`; `FIN_ReconciliationProcess.java:132-139` |
+| "Old not processed Bank Statements" | Inactive rule `1000010` on the older `c_bankstatement` table, flagging statements unprocessed over 10 days | `referencedData/AD_ALERTRULE.xml:150` |
+| Processing-lock trigger `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Locks only the bank's own fields on processed or matched lines | `APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:46-56, 63, 67, 72-83` |
+| Pick and Execute | Pattern of Find Transactions to Match and Match Statement | `OBUIAPP_PROCESS.xml:14, 91` |
+| Draft reconciliation | Status `DR`, checked before reactivation (C-10); completion stores no time | `APRM_MatchingUtility.java:681`; `FIN_ReconciliationProcess.java:99-106, 189-202`; `FIN_RECONCILIATION.xml:48-64` |
+
+```text
+Files named in Sections 3.1 and 3.2, under their folders
+modules/org.openbravo.advpaymentmngt/src-db/database/model/triggers/
+  APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml
+modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/
+  AD_FIELD.xml, AD_MESSAGE.xml, AD_TABLE.xml, AD_WINDOW.xml, OBUIAPP_PROCESS.xml
+modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/
+  actionHandler/MatchStatementActionHandler.java
+  actionHandler/MatchStatementOnLoadActionHandler.java
+  ad_actionbutton/Reconciliation.java
+  hqlinjections/MatchStatementTransformer.java
+  process/FIN_ReconciliationProcess.java
+  utility/APRM_MatchingUtility.java
+modules/org.openbravo.client.application/src/org/openbravo/client/application/
+  ADAlertDatasourceService.java
+  process/ResponseActionsBuilder.java
+modules/org.openbravo.client.myob/src-db/database/model/tables/
+  OBKMO_WIDGET_CLASS_ACCESS.xml
+modules/org.openbravo.client.querylist/src-db/database/model/tables/
+  OBCQL_WIDGET_QUERY.xml
+modules/org.openbravo.client.querylist/src-db/database/sourcedata/
+  OBUIAPP_PARAMETER.xml
+modules/org.openbravo.client.querylist/src/org/openbravo/client/querylist/
+  QueryListDataSource.java
+modules/org.openbravo.v3.datasets/referencedata/standard/
+  V3_Roles.xml
+modules/org.openbravo.v3.datasets/src-db/database/sourcedata/
+  AD_DATASET.xml
+src-db/database/model/tables/
+  AD_ALERT.xml, AD_ALERTRECIPIENT.xml, AD_ALERTRULE.xml, AD_USER.xml,
+  FIN_BANKSTATEMENTLINE.xml, FIN_RECONCILIATION.xml
+src-db/database/sourcedata/
+  AD_REF_LIST.xml
+src-db/database/sourcedata/referencedData/
+  AD_ALERTRULE.xml, AD_PROCESS_REQUEST.xml
+src-test/src/org/openbravo/test/datasource/
+  BaseDataSourceTestDal.java
+src/org/openbravo/erpCommon/ad_process/
+  AlertProcess.java
+src/org/openbravo/scheduling/
+  Frequency.java, OBScheduler.java
+
+Evidence for the tests and tools that Sections 4 and 7 reuse
+Phase 2 gate harnesses, run in the web-service suite (Section 4.3.12)
+  src-test/src/org/openbravo/test/datasource/HQLDataSourceTest.java:31-60
+  src-test/src/org/openbravo/test/datasource/DataSourceSecurity.java:57-64
+  src-test/src/org/openbravo/test/WebserviceTestSuite.java:93, 102
+Standalone suite with the scheduling and posting tests (Sections 2.1, 4.2.12, 4.4.4, 5.1.3)
+  src-test/src/org/openbravo/test/StandaloneTestSuite.java:309, 343
+  src-test/src/org/openbravo/scheduling/ProcessSchedulingTest.java:42-48, 94-101
+  src-test/src/org/openbravo/test/accounting/RecordID2Test.java:59-69, 97-121
+Build targets that run both suites
+  src-test/build.xml:76-103
+Browser test runner (Jest) and its three utility tests (C-08)
+  package.json:44-49
+  modules/org.openbravo.client.application/web-test/
+    ob-utilities-date.test.js:20-24
+    ob-utilities-number.test.js:30-36
+    ob-utilities-validUrl.test.js:25-30
+Grid column filters and saved views (REQ-14)
+  modules/org.openbravo.client.application/web/org.openbravo.client.application/js/grid/
+    ob-grid.js:1248-1261
+    ob-view-grid.js:1350-1365
+Scheduler run log (REQ-24)
+  src/org/openbravo/scheduling/ProcessLogger.java:19-20, 44-57
+  src/org/openbravo/scheduling/ProcessRunner.java:82-83, 99-102
+Record locking (REQ-25)
+  src/org/openbravo/dal/service/OBDal.java:752-791
+Process-response warnings (REQ-22)
+  modules/org.openbravo.client.application/src/org/openbravo/client/application/process/
+    ResponseActionsBuilder.java:39-40, 82-85, 120-127
+Audit state (U6): auditing per table, a separate setting for new records, excludable columns
+  src-db/database/model/tables/AD_TABLE.xml:120-127
+  src-db/database/sourcedata/AD_ELEMENT.xml:31346-31350
+  src/org/openbravo/erpCommon/ad_callouts/SL_TableAudit.java:38-51
+  src-db/database/model/tables/AD_COLUMN.xml:184-186
+```
 
 ## 4. Requirements by Phase
 
@@ -550,7 +628,7 @@ The seven unconfirmed facts and three assumptions keep their IDs from Project Gu
 | U3 | Match rates and volumes | Analysis 1, Section 5 | NFR-01, REQ-13, REQ-21, O-01 |
 | U4 | Posting configuration | Analysis 1, Section 1.2 | NFR-03 |
 | U5 | Posting schedule | Analysis 1, Section 1.2 | NFR-03; REQ-25 (the job never completes or posts) |
-| U6 | Audit state | Analysis 2, Section 2.2 | REQ-01 to REQ-04, REQ-09, REQ-10, whose fields add log volume at import if line auditing is on (Analysis 2, Section 4.2) |
+| U6 | Audit state | Analysis 2, Section 2.2 | REQ-01 to REQ-04, REQ-09, REQ-10, whose audited fields add log volume on every change, and at import only if new records are audited (Analysis 2, Section 4.2) |
 | U7 | Finance role holders | Analysis 1, Section 2.1 | REQ-16, REQ-18, REQ-20 |
 | A-1 | Finance role coverage | Analysis 1, Section 2.1 | REQ-16, REQ-18, REQ-19, REQ-20 |
 | A-2 | The basis of the effort ranking | Analysis 1, Section 5 | Phase order (Section 1.2); REQ-13; REQ-23 to REQ-25 |
