@@ -12,49 +12,49 @@
 
 ### 1.1 What the workbench does
 
-The request's objective is: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." A reconciliation is the period document confirming the system's balance agrees with the bank, and cycle time is the time from statement import to completed reconciliation. Manual effort is the staff work reconciliation takes.
+The request's objective is: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." A reconciliation is the period document confirming the system's balance agrees with the bank; cycle time is the time from statement import to completed reconciliation, and manual effort is the staff work reconciliation takes.
 
-Today, matching, linking a statement line (one entry on the statement the bank sends) to the transaction it settles, waits until a person opens Match Statement, the screen opened from a bank account to match its lines (Analysis 1, Section 3.3). A transaction is the system's record of money expected in or out of a financial account, the system's record for one bank account or one cash account, and a bank account may use a matching algorithm, the saved set of matching rules a bank account uses.
+Today, matching, linking a statement line (one entry on the statement the bank sends) to the transaction it settles, waits until someone opens Match Statement, the screen opened from a bank account to match its lines (Analysis 1, Section 3.3). A transaction is the system's record of money expected in or out of a financial account, the system's record for one bank account or one cash account; a matching algorithm is the saved set of matching rules a bank account uses.
 
-The workbench is the whole set of capabilities this document specifies. Each unmatched line, a line on a processed statement (one the system has confirmed) not yet linked to a transaction, becomes an exception, an unmatched line under the workbench's tracking. Each exception gets an owner (the person accountable for resolving a line), an exception status (a line's stage in the workbench), a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line), none of which is recorded today (Analysis 1, Section 4.3).
+The workbench is the whole set of capabilities this document specifies. Each unmatched line, a line on a processed statement (one the system has confirmed) not yet linked to a transaction, becomes an exception, an unmatched line under the workbench's tracking. Each exception gets an owner (the person accountable for resolving a line), an exception status (a line's stage in the workbench), a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line), none recorded today (Analysis 1, Section 4.3).
 
-The nine capabilities, F1 to F9, are grouped by phase below. Some reuse product tools: an alert is a system-generated to-do message sent to a user or role (a named set of screen and process permissions), a counts widget is a dashboard tile showing counts from a saved query, and a scheduled job is work the system runs on a timetable without a user.
+The request's five capabilities are exception fields; the worklist, the single list of exceptions across all in-scope bank accounts (those with a matching algorithm); alerts, each a system-generated on-screen to-do message sent to a user or role (a named set of screen and process permissions); the counts widget, a dashboard tile showing counts from a saved query; and scheduled matching by a scheduled job, work the system runs on a timetable without a user. Section 1.2 breaks them into nine, F1 to F9, by phase.
 
 ### 1.2 Delivery phases
 
-The phases follow Analysis 2, Section 6: data before what reads it, visible before unattended, and tests before changes. Each phase is accepted only once its test gate, the tests that must pass before a phase is accepted, has passed (Sections 4.2.12, 4.3.12 and 4.4.4). The order rests on the effort ranking of Analysis 1, Section 5 (A-2).
+The phases follow Analysis 2, Section 6: data before what reads it, visible before unattended, and tests before changes. Each phase ends with its test gate, the tests that must pass before a phase is accepted (Sections 4.2.12, 4.3.12 and 4.4.4). The order rests on the effort ranking of Analysis 1, Section 5 (A-2).
 
 | Phase | Capabilities | What users get |
 |---|---|---|
-| Phase 1: Data foundation | F1 Exception fields, F3 Weak-match flag, F4 Measurement stamps | Every line can carry a status, an owner, a reason code and a due date (an optional target date for resolving it), kept right on every match and unmatch (undoing a link). A weak match, a link the rules made using only their looser fallback checks, carries an unconfirmed weak match flag, meaning no confirmation has been recorded for it. Measurement stamps are the recorded time and source of each match and the completion time of each reconciliation. A backfill, filling a new field for rows that already exist, sets existing unmatched lines to Open. |
-| Phase 2: Visibility and follow-up | F2 Age, F5 Worklist, F6 Alerts, F7 Counts widget, F8 Reconcile warning | Ages grouped into age bands, the ranges of ages used to group lines, and the worklist, the single list of exceptions across all in-scope bank accounts (those with a matching algorithm), with filters and single-line actions. Daily alerts reach owners and the Finance role, the standard role for finance staff. The counts widget shows the backlog, and a warning flags lines left at completion. |
+| Phase 1: Data foundation | F1 Exception fields, F3 Weak-match flag, F4 Measurement stamps | Each line can carry a status, owner, reason code and due date (an optional target date for resolving it), kept right on every match and unmatch (undoing a link). A weak match, a link the rules made using only their looser fallback checks, carries an unconfirmed weak match flag, meaning no confirmation has been recorded for it. Measurement stamps are each match's recorded time and source and each reconciliation's completion time. A backfill, filling a new field for rows that already exist, sets existing unmatched lines to Open. |
+| Phase 2: Visibility and follow-up | F2 Age, F5 Worklist, F6 Alerts, F7 Counts widget, F8 Reconcile warning | Ages in age bands, the ranges of ages used to group lines, and the worklist, with filters and single-line actions. Daily alerts reach owners and the Finance role, the standard role for finance staff. The counts widget shows the backlog, and a warning flags lines left at completion. |
 | Phase 3: Automated matching | F9 Scheduled matching | Today's rules run after each import and nightly, so the worklist holds only what they could not match. |
 
 ### 1.3 What is excluded and deferred
 
-Excluded accounts are cash accounts and bank accounts with no matching algorithm, which use the older Reconciliation screen to tick cleared transactions without linking statement lines (Analysis 1, Section 1.3). Their users see what they see today, and Operations acceptance is O-05.
+Excluded accounts are cash accounts and bank accounts with no matching algorithm, which use the older Reconciliation screen to tick cleared transactions without linking statement lines (Analysis 1, Section 1.3). Their users see what they see today; Operations acceptance is O-05.
 
 | Area | In-scope bank account | Excluded account |
 |---|---|---|
-| Financial account buttons | Import Statement and Match Statement | Reconcile, which opens the older Reconciliation screen |
+| Financial account buttons | Import Statement and Match Statement | Reconcile, opening the older Reconciliation screen |
 | Worklist and counts widget | Listed and counted | Never listed or counted |
 | Aging and unassigned alerts | Raised daily | None |
 | Reconcile warning | Shown when lines remain | None |
 | Scheduled matching | After each import and nightly | Skipped and logged |
-| Exception fields | Set by worklist actions and by match and unmatch | Set only by the creation default and release backfill, shown nowhere |
+| Exception fields | Set by worklist actions, match and unmatch | Creation default and release backfill only; shown nowhere |
 
-The table-wide data foundation still sets these accounts' new and existing unmatched processed lines to Open (REQ-01, REQ-08, C-18), but no workbench requirement (REQ-12 to REQ-25) targets them.
+The table-wide data foundation sets these accounts' new and existing unmatched processed lines to Open (REQ-01, REQ-08, C-18), but no workbench requirement (REQ-12 to REQ-25) targets them.
 
 Analysis 2, Section 5.2 ranks six full-scope capabilities this release defers, each with a hook and no requirement.
 
 | Deferred item | Hook it relies on | Requirement in this release |
 |---|---|---|
-| Tolerance matching (rank 1) | The F3 flag, so looser matches land as unconfirmed weak matches, and the F4 stamps as a before-and-after baseline | None |
-| Learned rules (rank 2) | The F3 flag and the F4 stamps | None |
-| Bulk actions (rank 3) | The F1 fields are ordinary stored fields with defined change rules (Section 4.1.2) | None |
-| Weak-match review queue (rank 4) | The F3 flag | None |
+| Tolerance matching (rank 1) | F3 flag, so looser matches land as unconfirmed weak matches; F4 stamps, a before-and-after baseline | None |
+| Learned rules (rank 2) | F3 flag and F4 stamps | None |
+| Bulk actions (rank 3) | Ordinary stored F1 fields with defined change rules (Section 4.1.2) | None |
+| Weak-match review queue (rank 4) | F3 flag | None |
 | Audit history (rank 5) | Every new field is stored, so the change log can record it once switched on (Analysis 2, Section 2.2) | None |
-| Match-rate and cycle-time reporting (rank 6) | The F4 stamps | None |
+| Match-rate and cycle-time reporting (rank 6) | F4 stamps | None |
 
 ## 2. Traceability
 
@@ -662,38 +662,38 @@ Each requirement becomes at least one story, a delivery ticket, whose tests are 
 
 ## Appendix A. Glossary
 
-Existing terms are confirmed in the code at the address given; Proposed terms come from the requirement named.
+Existing terms are confirmed by the code cited, `...` marking omitted folders; Proposed terms come from the requirement or source cited.
 
 | Term | Plain meaning | Basis |
 |---|---|---|
-| Age, age band | Whole calendar days since the bank's date for the line; a range of ages used to group lines | Proposed (REQ-12), from the bank date at `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:52` |
-| Alert, alert rule, Alert Management | A system-generated to-do message sent to a user or role; the saved query that raises alerts; the screen listing a user's alerts | Existing: `src-db/database/model/tables/AD_ALERT.xml:3`; `modules/org.openbravo.client.application/src/org/openbravo/client/application/ADAlertDatasourceService.java:96-121` |
-| Auto-match rate, cycle time, manual effort | The share of statement lines matched with no person acting; the time from statement import to completed reconciliation; the staff work reconciliation takes | Analysis 1, Sections 1.1 and 6 |
+| Age, age band | Whole calendar days since the bank's date for the line; a range of ages used to group lines | Proposed (REQ-12), from the bank date `.../tables/FIN_BANKSTATEMENTLINE.xml:52` |
+| Alert, alert rule, Alert Management | A system-generated on-screen to-do message sent to a user or role; the saved query that raises alerts; the screen listing a user's alerts | Existing: `.../tables/AD_ALERT.xml:3`; `.../tables/AD_ALERTRULE.xml:3`; `.../ADAlertDatasourceService.java:96-121` |
+| Auto-match rate, cycle time, manual effort | The share of statement lines matched with no person acting; the time from statement import to completed reconciliation; the staff work reconciliation takes | Proposed: Analysis 1, Sections 1.1 and 6; not measured in code today |
 | Backfill | Filling a new field for rows that already exist | Proposed (REQ-08) |
-| Carried-forward line | An unmatched line left open when a reconciliation completes | Existing: `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/process/FIN_ReconciliationProcess.java:44` |
-| Client | The top-level company grouping that owns the data | Existing: `src/org/openbravo/dal/security/SecurityChecker.java:139-178` |
-| Counts widget | A dashboard tile showing counts from a saved query, the product's Query/List widget | Existing type: `modules/org.openbravo.client.querylist/src-db/database/model/tables/OBCQL_WIDGET_QUERY.xml:36-47`; the backlog widget is Proposed (REQ-21) |
+| Carry forward, carried-forward line | Leaving unmatched lines open when a reconciliation completes, so they reappear next period; such a line | Existing: Analysis 1, Section 4.2; `.../FIN_ReconciliationProcess.java:99-106`; `.../MatchStatementTransformer.java:63-78` |
+| Client | The top-level company grouping that owns the data | Existing: `.../SecurityChecker.java:139-178` |
+| Counts widget | A dashboard tile showing counts from a saved query, the product's Query/List widget | Existing type: `.../tables/OBCQL_WIDGET_QUERY.xml:36-47`; the backlog widget is Proposed (REQ-21) |
 | Digest | One alert carrying a count instead of one alert per line | Proposed (REQ-19, REQ-20) |
-| Draft reconciliation | An unfinished reconciliation; while one exists, no reconciliation of the account can be reopened | Existing, status `DR`: `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/process/FIN_ReconciliationProcess.java:132-139` |
+| Draft reconciliation | An unfinished reconciliation, at most one per account, that blocks reopening the account's other reconciliations | Existing, status `DR`: `.../APRM_MatchingUtility.java:681`; `.../FIN_ReconciliationProcess.java:132-139` |
 | Exception, workbench, worklist | An unmatched line under the workbench's tracking; the whole set of capabilities this document specifies; the single list of exceptions across all in-scope bank accounts | Proposed (REQ-13) |
 | Exception status, reason code, due date | A line's stage in the workbench; a coded record of why a line is unresolved; an optional target date for resolving it | Proposed (REQ-01, REQ-03, REQ-04) |
-| Financial account, in-scope account | The system's record for one bank account or one cash account; a bank account with a matching algorithm | Existing: `src-db/database/model/tables/FIN_FINANCIAL_ACCOUNT.xml:48`; `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_FIELD.xml:13450, 13505` |
-| Finance role | The standard role for finance staff | Existing: `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml:1898` |
-| Given/When/Then, story, `TBD` | A three-part test statement; a delivery ticket; a number still to be set by measurement | Document convention |
-| HQL | The query language that selects the records a list shows | Existing: `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_TABLE.xml:230` |
-| Match level, strong match, weak match | The code recording how a line was matched; a link the rules made using their main checks, labelled "Auto"; a link the rules made using only their looser fallback checks, labelled "Approved" (C-14) | Existing: `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/FIN_MatchedTransaction.java:26-27`; `src-db/database/sourcedata/AD_REF_LIST.xml:9273-9274` |
-| Match Statement, Match Transactions Force, Reconcile All | The screen opened from a bank account to match its lines; the variant limited to that period, shown when an earlier reconciliation is the open draft; the action that completes a reconciliation | Existing: `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/AD_FIELD.xml:13477, 16298-16304`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/actionHandler/MatchStatementActionHandler.java:59-66` |
-| Matching, matching algorithm, unmatch | Linking a statement line to the transaction it settles; the saved set of matching rules a bank account uses; undoing a link | Existing: `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:283-329, 377-436`; `src-db/database/model/tables/FIN_FINANCIAL_ACCOUNT.xml:116` |
-| Measurement stamps | The recorded time and source of each match and the completion time of each reconciliation | Proposed (REQ-10, REQ-11) |
-| Organization, role | A company or branch whose records a role may see; a named set of screen and process permissions | Existing: `src-db/database/model/tables/AD_ROLE.xml:3`; `src/org/openbravo/dal/security/SecurityChecker.java:156-178` |
+| Financial account, in-scope account | The system's record for one bank account or one cash account; a bank account with a matching algorithm, the only kind importing statements and using Match Statement | Existing: `.../tables/FIN_FINANCIAL_ACCOUNT.xml:48`; `...advpaymentmngt/.../AD_FIELD.xml:13450, 13505` |
+| Finance role | The standard role for finance staff | Existing: `.../V3_Roles.xml:1898` |
+| Given/When/Then, story, `TBD` | A three-part test statement; a delivery ticket; a number still to be set by measurement | Proposed: document convention |
+| HQL | The query language that selects the records a list shows | Existing: `...advpaymentmngt/.../AD_TABLE.xml:230` |
+| Match level, strong match, weak match | The code recording how a line was matched; a link the rules made using their main checks, labelled "Auto"; a link the rules made using only their looser fallback checks, labelled "Approved" (C-14) | Existing: `.../FIN_MatchedTransaction.java:26-27`; `src-db/.../sourcedata/AD_REF_LIST.xml:9273-9274` |
+| Match Statement, Match Transactions Force, Reconcile All | The screen opened from a bank account to match its lines; the variant limited to that period, shown when an earlier reconciliation is the open draft; the action that completes a reconciliation | Existing: `...advpaymentmngt/.../AD_FIELD.xml:13477, 16298-16304`; `.../MatchStatementActionHandler.java:59-66` |
+| Matching, matching algorithm, unmatch | Linking a statement line to the transaction it settles; the saved set of matching rules a bank account uses; undoing a link | Existing: `.../APRM_MatchingUtility.java:283-329, 377-436`; `.../tables/FIN_FINANCIAL_ACCOUNT.xml:116` |
+| Measurement stamps | Each match's recorded time and source, and each reconciliation's completion time | Proposed (REQ-10, REQ-11) |
+| Organization, role | A company or branch whose records a role may see; a named set of screen and process permissions | Existing: `.../tables/AD_ROLE.xml:3`; `.../SecurityChecker.java:156-178` |
 | Owner, assign, claim | The person accountable for resolving a line; giving a line to someone; taking an unassigned line for oneself | Proposed (REQ-02, REQ-16) |
-| Pick and Execute | A pop-up grid where a user selects rows and runs an action on them | Existing: `modules/org.openbravo.advpaymentmngt/src-db/database/sourcedata/OBUIAPP_PROCESS.xml:91` |
-| Posting | Creating the accounting entries in the general ledger, the company's books | Existing: `src/org/openbravo/erpCommon/ad_forms/DocFINReconciliation.java:71` |
-| Processed statement, processing lock | A statement the system has confirmed; the database rule that stops changes to the bank's own details on a confirmed statement | Existing: `src-db/database/model/tables/FIN_BANKSTATEMENT.xml:76`; `modules/org.openbravo.advpaymentmngt/src-db/database/model/triggers/APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:39-56` |
-| Reconciliation, older Reconciliation screen | The period document confirming the system's balance agrees with the bank; the screen where excluded accounts tick cleared transactions | Existing: `src-db/database/model/tables/FIN_RECONCILIATION.xml:48-64`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/ad_actionbutton/Reconciliation.java:74` |
-| Regression risk, test gate | A chance that something working today breaks; the tests that must pass before a phase is accepted | Analysis 2, Section 4 |
-| Scheduled job | Work the system runs on a timetable without a user | Existing: `src/org/openbravo/scheduling/OBScheduler.java:124, 159`; the matching job is Proposed (REQ-24) |
-| Split, merge | Dividing a line into a matched part and an unmatched remainder; rejoining the unmatched parts | Existing: `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:774-852, 445-496` |
-| Statement line, unmatched line | One entry on the statement the bank sends; a line on a processed statement not yet linked to a transaction | Existing: `src-db/database/model/tables/FIN_BANKSTATEMENTLINE.xml:2-112`; `modules/org.openbravo.advpaymentmngt/src/org/openbravo/advpaymentmngt/utility/APRM_MatchingUtility.java:628-641` |
-| Transaction | The system's record of money expected in or out of a financial account | Existing: `src-db/database/model/tables/FIN_FINACC_TRANSACTION.xml:3` |
+| Pick and Execute | A pop-up grid where a user selects rows and runs an action on them | Existing: `...advpaymentmngt/.../OBUIAPP_PROCESS.xml:91` |
+| Posting | Creating the accounting entries in the general ledger, the company's books | Existing: `.../DocFINReconciliation.java:71` |
+| Processed statement, processing lock | A statement the system has confirmed; the database rule that stops changes to the bank's own details on a confirmed statement | Existing: `.../tables/FIN_BANKSTATEMENT.xml:76`; `.../APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:39-56` |
+| Reconciliation, older Reconciliation screen | The period document confirming the system's balance agrees with the bank; the screen where excluded accounts tick cleared transactions | Existing: `.../tables/FIN_RECONCILIATION.xml:48-64`; `.../Reconciliation.java:74` |
+| Regression risk, test gate | A chance that something working today breaks; the tests that must pass before a phase is accepted | Proposed: Analysis 2, Section 4 |
+| Scheduled job | Work the system runs on a timetable without a user | Existing: `.../OBScheduler.java:124, 159`; the matching job is Proposed (REQ-24) |
+| Split, merge | Dividing a line into a matched part and an unmatched remainder; rejoining the unmatched parts | Existing: `.../APRM_MatchingUtility.java:774-852, 445-496` |
+| Statement line, unmatched line | One entry on the statement the bank sends; a line on a processed statement not yet linked to a transaction | Existing: `.../tables/FIN_BANKSTATEMENTLINE.xml:2-112`; `.../APRM_MatchingUtility.java:628-641` |
+| Transaction | The system's record of money expected in or out of a financial account | Existing: `.../tables/FIN_FINACC_TRANSACTION.xml:3` |
 | Unconfirmed weak match flag | A mark the system sets when the rules make a weak match, meaning no confirmation has been recorded for it; only an unmatch clears it in this release | Proposed (REQ-09) |
