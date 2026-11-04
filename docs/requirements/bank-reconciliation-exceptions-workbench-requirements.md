@@ -64,7 +64,8 @@ Each row links a finding of the analyses to its capability, requirements, phase 
 
 | Analysis finding | Capability (F#) | REQ IDs | Objective element | Phase |
 |---|---|---|---|---|
-| Lines have no owner, reason, status or due date, and free text cannot be counted by cause (Analysis 1, Sections 4.3 and 6; Analysis 2, Section 3) | F1 | REQ-01 to REQ-08 | Owner, reason code | 1 |
+| Lines have no owner, reason, status or due date (Analysis 1, Section 4.3; Analysis 2, Section 3) | F1 | REQ-01 to REQ-08 | Owner, reason code | 1 |
+| Free text cannot be counted by cause (Analysis 1, Sections 4.3 and 6) | F1 | REQ-03 | Reason code | 1 |
 | The processing lock, the database rule that stops changes to the bank's own details on a confirmed statement, leaves new fields editable (Analysis 2, Sections 3 and 5.1, rank 2) | F1 | REQ-07, NFR-04 | Owner, reason code | 1 |
 | Weak matches are applied unconfirmed, and wrong links surface only on review (Analysis 1, Sections 3.3 and 5, item 3; Analysis 2, Section 5.2, rank 4) | F3 | REQ-09 | Auto-match rate, manual effort | 1 |
 | Run counts are not stored, unmatching clears the match level (the code recording how a line was matched), and no match or completion time is kept (Analysis 1, Sections 6 and 7; Analysis 2, Section 5.2, rank 6) | F4 | REQ-10, REQ-11 | Auto-match rate, cycle time | 1 |
@@ -76,7 +77,7 @@ Each row links a finding of the analyses to its capability, requirements, phase 
 | Nothing is matched between import and a user session, and nothing signals a waiting statement (Analysis 1, Sections 3.3 and 5, item 5; Analysis 2, Section 5.1, rank 3) | F9 | REQ-23 to REQ-25 | Auto-match rate, cycle time, manual effort | 3 |
 | Worklist speed cannot be determined from code (Analysis 2, Sections 1.4 and 7) | F5, F7 | NFR-01 | Manual effort | 2 |
 | Organization grants limit each role to its organizations, the companies or branches whose records a role may see (Analysis 2, Section 2.2) | F5 to F7 | NFR-02 | Owner | 2 |
-| Posting, creating the accounting entries in the general ledger (the company's books), is High severity and only partly tested (`RecordID2Test` reposts existing reconciliations); statement processing is High severity and untested (Analysis 2, Sections 3 and 4.2) | F1, F4, F9 | NFR-03, NFR-04 | Safeguard, no element | 1 to 3 |
+| Posting, creating the accounting entries in the general ledger (the company's books), is High severity and only partly tested (`RecordID2Test` reposts existing reconciliations); statement processing is High severity and untested; the processing lock covers only the bank's fields (Analysis 2, Sections 3 and 4.2) | F1, F4, F9 | NFR-03, NFR-04 | Safeguard, no element | 1 to 3 |
 
 ### 2.2 Two-way check
 
