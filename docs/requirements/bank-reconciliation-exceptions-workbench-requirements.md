@@ -148,7 +148,7 @@ Every other name the request uses exists as described; a conflict ID marks a dif
 
 #### 4.1.1 Entry format
 
-Each requirement keeps a fixed ID; a dropped one keeps its ID and is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement of one starting state, one action and one observable result. The regression risk, a chance that something working today breaks, names an integration area of Analysis 2, Section 4.2 with its severity.
+Each requirement keeps a fixed ID; a dropped one is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement of one starting state, one action and one observable result. The regression risk, a chance that something working today breaks, names an integration area of Analysis 2, Section 4.2 with its severity.
 
 #### 4.1.2 Edit policy
 
@@ -160,7 +160,7 @@ This is the one statement of who may change the new fields; REQ-07, REQ-15, REQ-
 | Matched line, including Resolved weak-match rows | Nothing | None; read-only | Back to Open, flag and stamps cleared on unmatch; split and merge rules (REQ-06) |
 | Line of an excluded account | Nothing | Never listed | Creation default and release backfill only |
 | Reconciliation | Nothing | None | Completion time set on completion, cleared on reactivation |
-| Reason-code list | Codes and their wording, by users granted its maintenance screen | The reason-code maintenance screen | None |
+| Reason-code list | Codes and their wording, by users granted its maintenance screen | Its maintenance screen | None |
 
 The new fields are not made editable on existing screens such as the Bank Statement Lines tab.
 
@@ -443,7 +443,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 - Reused / new: Reuses today's rules and switches, moved out of the screen action.
 - Acceptance criteria:
   - Given fixed sample lines, when matching runs from Match Statement before and after the change, then every line gets the same link at the same level.
-  - Given the same sample and no user signed in, when the job runs, then it makes the same links.
+  - Given fixed sample lines and no user signed in, when the job runs, then each line gets its Match Statement link and level.
 - Regression risk: Automatic matching (High).
 
 #### 4.4.2 REQ-24: When matching runs (F9)
@@ -465,7 +465,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
   - Given an account with a draft, when the job links lines, then it uses that draft, creates no other and completes none.
   - Given an account with no draft and nothing to match, when the job runs, then no draft is created.
   - Given a user matching a line, when the job reaches the same account, then the user's match stands.
-- Regression risk: Scheduling (High).
+- Regression risk: Scheduling (High); Reconciliation completion and balances (High).
 
 #### 4.4.4 Phase 3 test gate
 
@@ -482,25 +482,26 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 - Sources: Analysis 1, Section 7; Analysis 2, Sections 1.4 and 4.2.
 - Reused / new: Reuses the grid timing Analysis 2, Section 4.2 suggests; volumes are unknown from code (U3).
 - Acceptance criteria:
-  - Given that copy, when a user opens the worklist, then the time to first rows is recorded against the limit.
-  - Given the same copy, when the widget loads, then its load time is recorded against the limit.
+  - Given the production copy, when a user opens the worklist, then its first rows appear within the limit.
+  - Given the production copy, when the counts widget loads, then its counts appear within the limit.
 - Regression risk: Match Statement grid (High).
 
 ### 5.2 NFR-02: Organization and role scoping (F5, F6, F7)
 
 - Requirement: The system shall scope the worklist, both alerts and the counts widget by role grants and organization access, so every count a user sees covers only organizations readable under the role in use.
 - Sources: Analysis 1, Section 2.1; Analysis 2, Sections 2.2 and 5.1, rank 5.
-- Reused / new: Reuses role grants and organization access; both alerts count per organization (C-04, C-05).
+- Reused / new: Reuses role grants and organization access; both alerts count per organization (C-04, C-05); the widget query holds the organization limit (C-09).
 - Acceptance criteria:
-  - Given a user whose role reads one of two organizations, when they open the worklist or the widget, then only that organization's lines appear and count.
-  - Given the same user, when they open Alert Management, then every aging alert and digest they see belongs to that organization.
+  - Given a role reading one of two organizations, when its user opens the worklist, then only that organization's lines show.
+  - Given a role reading one of two organizations, when its user opens the counts widget, then it counts only that organization's lines.
+  - Given a role reading one of two organizations, when its user opens Alert Management, then only that organization's aging alerts and digests show.
 - Regression risk: Roles and access (Medium).
 
 ### 5.3 NFR-03: No change to posting (F1, F4, F9)
 
 - Requirement: The system shall leave posting and every accounting entry it produces unchanged.
 - Sources: Analysis 1, Section 1.2; Analysis 2, Section 4.2.
-- Reused / new: Reuses posting as it is; the job never completes or posts (REQ-25, U4, U5).
+- Reused / new: Reuses posting unchanged; the job never completes or posts (REQ-25, U4, U5).
 - Acceptance criteria:
   - Given the sample reconciliations the posting test (`RecordID2Test`) reposts, when it runs after each phase, then the balances are unchanged.
   - Given a reconciliation completed after release, when it is posted, then its entries equal those of the same lines completed before release.
@@ -510,7 +511,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 
 - Requirement: The system shall leave the processing-lock trigger (`APRM_FIN_BNKSTM_LINE_CHECK_TRG`) unchanged.
 - Sources: Analysis 1, Section 2.1; Analysis 2, Sections 3 and 4.2.
-- Reused / new: Reuses the lock as it is; REQ-07 relies on the new fields staying outside it.
+- Reused / new: Reuses the lock unchanged; REQ-07 relies on the new fields staying outside it.
 - Acceptance criteria:
   - Given a processed line, when a user changes its date, amount or reference, then the change is refused as today.
   - Given the trigger before and after release, when the two are compared, then they are identical.
@@ -522,14 +523,14 @@ The objective reads: "Reduce manual effort and cycle time in bank reconciliation
 
 | Objective element | Support now | Support after this release | How this release changes it |
 |---|---|---|---|
-| Auto-match rate | Partial | Partial | F9 raises it, and F3 and F4 make it measurable |
+| Auto-match rate | Partial | Partial | F9 raises it; F3 and F4 make it measurable |
 | Owner | None | Full | F1, F5 and F6 give every exception an owner |
 | Age | Partial | Full | F2 shows it on the worklist, alerts and widget (F5, F6, F7) |
 | Reason code | None | Full | F1, F5 and F7 record and count it; it is never mandatory (REQ-07) |
 | Cycle time | None | Partial | F9 shortens waits, F4 records match and completion times, and F8 surfaces leftovers |
-| Manual effort | Partial | Partial | F5 and F9 cut manual touches; staff time is still not recorded |
+| Manual effort | Partial | Partial | F5 and F9 cut manual touches; staff time is still unrecorded |
 
-Auto-match rate and cycle time are enabled by F4 but not measured until the deferred reporting ships. Their targets are O-01 and O-02.
+Auto-match rate and cycle time, enabled by F4, stay unmeasured until the deferred reporting ships. Their targets are O-01 and O-02.
 
 ## 7. Unconfirmed Items and Assumptions
 
@@ -552,11 +553,11 @@ The seven unconfirmed facts and three assumptions keep their IDs as listed in Pr
 
 | ID | Open item | Measurement or decision that closes it | Requirements affected |
 |---|---|---|---|
-| O-01 | The share of lines that counts as "most" matched without human touch: `TBD` | Lines whose recorded match source is the job or the rules, divided by lines imported, per account and month, over a baseline after Phase 3. Whether rules run from Match Statement count as untouched is part of the decision. A line a user unmatched and a later run rematched looks untouched, which the deferred audit history refines (Analysis 2, Section 3). | Section 6 |
-| O-02 | Cycle-time target: `TBD` | Median time from statement import to the completion time (REQ-11), per statement, over a baseline period | Section 6 |
+| O-01 | The share of lines that counts as "most" matched without human touch: `TBD` | Lines whose recorded match source is the job or the rules, divided by lines imported, per account and month, over a baseline after Phase 3. The decision also settles whether rules run from Match Statement count as untouched. A line a user unmatched and a later run rematched looks untouched, which the deferred audit history refines (Analysis 2, Section 3). | Section 6 |
+| O-02 | Cycle-time target: `TBD` | Median time from statement import to the completion time (REQ-11), per statement, over a baseline | Section 6 |
 | O-03 | Final wording of the eight reason codes | Confirmation by Finance | REQ-03 |
 | O-04 | Age-band boundaries | Decision by Finance | REQ-12, REQ-14, REQ-21 |
-| O-05 | Operations team acceptance of the exclusion | Sign-off by the Operations team | Section 1.3 |
+| O-05 | Operations team acceptance of the exclusion | Operations team sign-off | Section 1.3 |
 | O-06 | Installation fact: the V3 Roles dataset is applied in each client, so the Finance role exists | A check of each client | REQ-16, REQ-18, REQ-20 |
 | O-07 | Installation fact: the alert run's time in each installation, which core setup puts daily at 23:59 | A check of each schedule, so nightly matching finishes first | REQ-19, REQ-20, REQ-24 |
 | O-08 | Installation fact: installed bank file formats accept the new fields through their defaults (U1) | A test import through each installed format | REQ-01, REQ-24 |
@@ -564,7 +565,7 @@ The seven unconfirmed facts and three assumptions keep their IDs as listed in Pr
 
 ## 9. Handoff to Tickets
 
-Each requirement becomes at least one story, a delivery ticket, whose tests are its criteria unchanged. Stories follow phase order and are accepted only after their phase's gate passes, the manual check of C-08 included. Gate tests are stories of their own, and tests of today's split, merge, unmatch and matching passes come before the stories that change them (Analysis 2, Section 6).
+Each requirement becomes at least one story, a delivery ticket, whose tests are its criteria unchanged. Stories follow phase order and are accepted only after their phase's gate passes, the manual check of C-08 included. Gate tests are their own stories, and tests of today's split, merge, unmatch and matching passes come before the stories that change them (Analysis 2, Section 6).
 
 | REQ IDs | Minimum stories | Phase | Gate before acceptance |
 |---|---|---|---|
