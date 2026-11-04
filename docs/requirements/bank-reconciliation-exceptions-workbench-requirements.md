@@ -2,11 +2,11 @@
 
 ## Key Takeaways
 
-- Every unlinked statement line (one entry on the statement the bank sends) gets an owner (the person accountable for resolving a line), a status, a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line).
-- Three phases: data foundation; a cross-account list, to-do messages and dashboard counts; then automatic linking on a timetable.
-- Cash accounts and bank accounts lacking linking rules keep today's screens; six deferred items get only a hook.
+- Workbench (capabilities specified here): every unlinked statement line (one entry on the statement the bank sends) gets an owner (the person accountable for resolving a line), a status (a line's stage in the workbench), a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line).
+- Three phases: data foundation; cross-account list, to-do messages and dashboard counts; automatic linking on a timetable.
+- Cash and bank accounts lacking linking rules keep today's screens; six deferred items get only a hook.
 - Main conflicts settled: to-do messages count per company or branch, a reopened earlier period limits linking, fields reach every line.
-- Still `TBD`, numbers to be set by measurement: the share of lines counting as "most", the import-to-completion time target and load times; age bands, the ranges of ages used to group lines, await a decision.
+- Still `TBD`, numbers to be set by measurement: the share of lines counting as "most", the import-to-completion time target and load times; age bands, ranges of ages used to group lines, await a decision.
 
 ## 1. Summary
 
@@ -611,8 +611,8 @@ The objective reads: "Reduce manual effort and cycle time in bank reconciliation
 
 | Support level | Meaning |
 |---|---|
-| Full | The code delivers and records the element |
-| Partial | Only part is delivered or recorded |
+| Full | The code delivers the element and records or calculates it |
+| Partial | Only part is delivered, recorded or calculated |
 | None | Neither |
 
 | Objective element | Support now | Support after this release | How this release changes it |
