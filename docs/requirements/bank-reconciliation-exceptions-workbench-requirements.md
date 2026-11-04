@@ -164,7 +164,7 @@ This is the one statement of who may change the new fields; REQ-07, REQ-15, REQ-
 
 The new fields are not made editable on existing screens such as the Bank Statement Lines tab.
 
-### 4.2 Phase 1: Data foundation
+### 4.2 Phase 1, Data foundation
 
 #### 4.2.1 REQ-01: Exception status (F1)
 
@@ -224,16 +224,18 @@ The new fields are not made editable on existing screens such as the Bank Statem
 ```mermaid
 flowchart LR
     accTitle: Figure 1. Exception status of a statement line
-    accDescr: Users move a line between Open, Assigned and In Review; a match sets Resolved and an unmatch returns it to Open.
-    O["Open"] -->|"Assign or claim"| A["Assigned"]
+    accDescr: Assign, claim or a user's choice makes an Open line Assigned; users move a line between Open, Assigned and In Review in any direction; a match from any of them sets Resolved, and an unmatch returns it to Open with the owner kept.
+    O["Open"] -->|"Assign, claim or user choice"| A["Assigned"]
+    A -->|"User choice"| O
     A <-->|"User choice"| R["In Review"]
+    O <-->|"User choice"| R
     O -->|"Match"| X["Resolved"]
     A -->|"Match"| X
     R -->|"Match"| X
     X -->|"Unmatch, owner kept"| O
 ```
 
-**How to read this:** Each box is a status and each arrow the event that changes it; users choose among Open, Assigned and In Review, and only a match sets Resolved.
+**How to read this:** Boxes are statuses, arrows the events that change them; users choose among Open, Assigned and In Review, and only a match sets Resolved.
 
 #### 4.2.6 REQ-06: Split and merge (F1)
 
@@ -307,7 +309,7 @@ flowchart LR
 
 No test refers to the matching utility (`APRM_MatchingUtility`) today, so these tests first pin today's behaviour (Analysis 2, Section 4.2).
 
-### 4.3 Phase 2: Visibility and follow-up
+### 4.3 Phase 2, Visibility and follow-up
 
 #### 4.3.1 REQ-12: Age and age bands (F2)
 
@@ -437,7 +439,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 
 This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 
-### 4.4 Phase 3: Automated matching
+### 4.4 Phase 3, Automated matching
 
 #### 4.4.1 REQ-23: Shared matching logic (F9)
 
@@ -479,7 +481,9 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 
 ## 5. Non-Functional Requirements
 
-### 5.1 NFR-01: Speed at real volumes (F5, F7)
+### 5.1 Requirement entries
+
+#### 5.1.1 NFR-01: Speed at real volumes (F5, F7)
 
 - Requirement: The system shall load the worklist and the counts widget within a `TBD` time limit, set by timing the first rows on a copy of production holding the largest account's open lines.
 - Sources: Analysis 1, Section 7; Analysis 2, Sections 1.4 and 4.2.
@@ -489,7 +493,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
   - Given the production copy, when the counts widget loads, then its counts appear within the limit.
 - Regression risk: Match Statement grid (High).
 
-### 5.2 NFR-02: Organization and role scoping (F5, F6, F7)
+#### 5.1.2 NFR-02: Organization and role scoping (F5, F6, F7)
 
 - Requirement: The system shall scope the worklist, both alerts and the counts widget by role grants and organization access, so every count a user sees covers only organizations readable under the role in use.
 - Sources: Analysis 1, Section 2.1; Analysis 2, Sections 2.2 and 5.1, rank 5.
@@ -500,7 +504,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
   - Given a role reading one of two organizations, when its user opens Alert Management, then only that organization's aging alerts and digests show.
 - Regression risk: Roles and access (Medium).
 
-### 5.3 NFR-03: No change to posting (F1, F4, F9)
+#### 5.1.3 NFR-03: No change to posting (F1, F4, F9)
 
 - Requirement: The system shall leave posting and every accounting entry it produces unchanged.
 - Sources: Analysis 1, Section 1.2; Analysis 2, Section 4.2.
@@ -510,7 +514,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
   - Given a reconciliation completed after release, when it is posted, then its entries equal those of the same lines completed before release.
 - Regression risk: Posting (High).
 
-### 5.4 NFR-04: No change to the processing lock (F1)
+#### 5.1.4 NFR-04: No change to the processing lock (F1)
 
 - Requirement: The system shall leave the processing-lock trigger (`APRM_FIN_BNKSTM_LINE_CHECK_TRG`) unchanged.
 - Sources: Analysis 1, Section 2.1; Analysis 2, Sections 3 and 4.2.
