@@ -148,7 +148,7 @@ Every other name the request uses exists as described; a conflict ID marks a dif
 
 #### 4.1.1 Entry format
 
-Each requirement keeps a fixed ID; a dropped one is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement of one starting state, one action and one observable result. The regression risk, a chance that something working today breaks, names an integration area of Analysis 2, Section 4.2 with its severity.
+Each requirement keeps a fixed ID; a dropped one is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement: one starting state, one action and one observable result. The regression risk, a chance that something working today breaks, names its Analysis 2, Section 4.2 integration areas and their severity.
 
 #### 4.1.2 Edit policy
 
@@ -170,10 +170,10 @@ The new fields are not made editable on existing screens such as the Bank Statem
 
 - Requirement: The system shall give every statement line a status of Open, Assigned, In Review or Resolved, treating new lines and a missing status as Open.
 - Sources: Analysis 1, Section 4.3; Analysis 2, Sections 3 and 3.1.
-- Reused / new: Reuses the match-level list's pattern; the default keeps bank file formats working.
+- Reused / new: Reuses the match-level list's pattern; the default (C-18) keeps bank file formats working.
 - Acceptance criteria:
   - Given a bank file, when a user imports it, then every new line is Open.
-  - Given a line of a statement unprocessed at release, when it is processed unmatched, then the worklist shows it Open.
+  - Given an in-scope account's unmatched line with no status, when a worklist user who can read its organization opens the worklist, then the line shows Open.
 - Regression risk: Statement import (High).
 
 #### 4.2.2 REQ-02: Owner (F1)
@@ -190,7 +190,7 @@ The new fields are not made editable on existing screens such as the Bank Statem
 
 - Requirement: The system shall let every statement line carry at most one reason code from a company-maintained list, shipped with eight codes worded exactly: Bank fee, no transaction; Timing difference; Amount mismatch; Partner or reference mismatch; Duplicate; Payment missing in ERP; Wrong weak match; Other.
 - Sources: Analysis 1, Sections 4.3 and 6; Analysis 2, Section 3.
-- Reused / new: Reuses the pattern of the partner-guessing exclusion list; adds the list, its maintenance screen and the field (O-03).
+- Reused / new: Reuses the partner-guessing exclusion list's pattern; adds the list, its maintenance screen and the field (O-03).
 - Acceptance criteria:
   - Given a new installation, when an administrator opens the reason-code list, then it holds exactly these eight codes.
   - Given a line with no reason code, when its reconciliation completes, then completion succeeds.
@@ -212,7 +212,7 @@ The new fields are not made editable on existing screens such as the Bank Statem
   matched, by the rules or by a user, and back to Open when it is unmatched, keeping its
   owner, reason code and due date.
 - Sources: Analysis 1, Section 4.2; Analysis 2, Section 3.
-- Reused / new: Reuses the existing match and unmatch actions; adds the status change.
+- Reused / new: Reuses the existing match and unmatch actions; adds the status change (C-13).
 - Acceptance criteria:
   - Given an Assigned line, when a user links it to a transaction, then its status is Resolved.
   - Given a Resolved line with an owner, when a user unmatches it, then its status is Open
@@ -252,7 +252,7 @@ flowchart LR
 - Reused / new: Reuses the lock, which checks only the bank's own fields.
 - Acceptance criteria:
   - Given a processed, matched line, when the system writes its status, then the write succeeds and its amounts stay locked.
-  - Given lines with no owner or reason code, when their statement is imported, matched, reconciled and posted, then every step succeeds.
+  - Given lines with no owner or reason code, when a user imports, processes, matches, reconciles or posts them, then that step succeeds.
   - Given the Bank Statement Lines tab, when a user opens a line, then the new fields are not editable.
 - Regression risk: Statement processing (High).
 
@@ -260,9 +260,9 @@ flowchart LR
 
 - Requirement: The system shall, at release, set every existing unmatched line on a processed statement, on any account, to Open with no owner or reason code, leaving other lines' status empty and no weak-match flag set.
 - Sources: Analysis 1, Sections 4.2 and 4.3; Analysis 2, Section 3.
-- Reused / new: Adds a one-time backfill over the whole table (C-18), so carried-forward lines become Open exceptions.
+- Reused / new: Adds a one-time, table-wide backfill (C-18), so carried-forward lines become Open exceptions.
 - Acceptance criteria:
-  - Given unmatched processed lines on an in-scope account and a cash account, when the backfill runs, then both are Open and only the first is listed.
+  - Given an organization's unmatched processed lines on an in-scope account and a cash account, when the backfill runs, then both are Open and a worklist user who can read that organization sees only the first.
   - Given a weak match made before release, when the backfill runs, then its status stays empty and it has no flag (C-15).
 - Regression risk: Statement processing (High).
 
@@ -270,17 +270,18 @@ flowchart LR
 
 - Requirement: The system shall set the unconfirmed weak match flag whenever the rules link a line at the weak level, clear it on unmatch, and never set it on a manual match.
 - Sources: Analysis 1, Sections 3.3 and 5, item 3; Analysis 2, Sections 3 and 5.2, rank 4.
-- Reused / new: Reuses the weak level (`AP`, labelled "Approved", C-14); adds the flag, shown as "Unconfirmed weak match".
+- Reused / new: Reuses the weak level (`AP`, labelled "Approved", C-14); adds the flag, shown as "Unconfirmed weak match" (C-06, C-15, C-17).
 - Acceptance criteria:
   - Given a line only a fallback check matches, when automatic matching runs, then it is linked weakly and flagged.
-  - Given a flagged line, when a user unmatches it and links it by search, then it has no flag.
-- Regression risk: Automatic matching (High).
+  - Given a flagged line, when a user unmatches it, then it has no flag.
+  - Given an unmatched line, when a user links it by search, then it has no flag.
+- Regression risk: Automatic matching (High); Manual match, split, unmatch (High).
 
 #### 4.2.10 REQ-10: Match time and source (F4)
 
 - Requirement: The system shall record on every match its date, time and source (rules run from Match Statement, a user's search or add, or the scheduled job), clearing them on unmatch.
 - Sources: Analysis 1, Sections 6 and 7; Analysis 2, Sections 3 and 5.2, rank 6.
-- Reused / new: Reuses the single place every match is written; adds the fields.
+- Reused / new: Reuses the single place every match is written; adds the fields (C-06).
 - Acceptance criteria:
   - Given an unmatched line, when a user links it by search, then it records the time and the source "user search or add".
   - Given a line the rules matched, when a user unmatches it, then its time and source are empty.
@@ -290,7 +291,7 @@ flowchart LR
 
 - Requirement: The system shall record the date and time of each completion made through the reconciliation completion process, clearing it on reactivation.
 - Sources: Analysis 1, Sections 6 and 7; Analysis 2, Section 5.2, rank 6.
-- Reused / new: Reuses the completion step; the older Reconciliation screen is excluded.
+- Reused / new: Reuses the completion step (C-06); the older Reconciliation screen is excluded.
 - Acceptance criteria:
   - Given a draft reconciliation, when a user completes it with Reconcile All, then it records the completion time.
   - Given a completed reconciliation, when a user reactivates it, then its completion time is empty.
