@@ -3,7 +3,7 @@
 ## Key Takeaways
 
 - A bank file reaches the company's books (`FACT_ACCT`) in twelve steps, most started by a person.
-- People act at 40 points, the per-line ones in the `Match Statement` screen.
+- People act at 55 points, the per-line ones in the `Match Statement` screen.
 - The rules (`StandardMatchingAlgorithm`) need exact amounts, take the first match and wait for a user.
 - No unmatched line records who must fix it or why, or shows how old it is (`FIN_BANKSTATEMENTLINE`).
 - Per-line resolution is the top effort (`APRM_MatchingUtility`); match rates are not determinable from code.
@@ -60,7 +60,7 @@ flowchart TD
    - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE`, partners in `C_BPARTNER` and excluded words in `FIN_BANKFILE_EXCEPTION`; writes partner and GL item on new lines.
    - **User sees:** nothing; the final message counts only inserted lines (`RowsInserted`), dropping the prepared zero-amount note (`APRM_ZeroAmountNotInserted`).
 4. **Process the statement at once.**
-   - **What happens:** The import processes the statement at once for matching (`FIN_AddPayment`). A line dated on or before the latest line of earlier processed statements (or, if none, the last reconciliation's end date) leaves it unprocessed until dates are corrected (`FIN_BankStatementProcess`). Force-processing is offered only if a line here is matched or the account has a line dated after this statement's last (`APRM_ISRECONCILED`), so it may be unavailable (Section 2.1, row 14).
+   - **What happens:** The import processes the statement at once for matching (`FIN_AddPayment`). A line dated on or before the latest line of earlier processed statements (or, if none, the last reconciliation's end date) leaves it unprocessed until dates are corrected (`FIN_BankStatementProcess`). Force-processing is offered only if a line here is matched or the account has a line dated after this statement's last (`APRM_ISRECONCILED`), so it may be unavailable (Section 2.1, row 16).
    - **Done by:** `FIN_AddPayment`, which runs `FIN_BankStatementProcess`.
    - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE` and the last completed reconciliation in `FIN_RECONCILIATION`; writes the processed flag on `FIN_BANKSTATEMENT`.
    - **User sees:** the statement number and lines inserted (`APRM_BankStatementNo`), or the date warning naming the cut-off date and lines (`APRM_BankStatementLineWrongDateWarning`, `APRM_BankStatementLineWrongDateWarning2`).
@@ -154,220 +154,226 @@ flowchart TD
 
 ### 1.3 Accounts and Periods Outside the Main Path
 
-- **Accounts reconciled without a bank file:** only bank-type accounts with a record in `FIN_MATCHING_ALGORITHM_ID` show `Import Statement` and `Match Statement`; cash accounts, and bank accounts without one, show `Reconcile` (`EM_APRM_RECONCILE`), opening the older `Reconciliation` screen, where the user ticks transactions as cleared without linking statement lines. A workbench tracking unmatched lines would miss these accounts (Section 2.1, rows 29 and 30; mixing ban, Section 4.4).
-- **Reopening an earlier period:** once an earlier reconciliation is force-reopened (Section 2.1, row 34), `Match Transactions Force` replaces `Match Statement`, working only on lines up to its end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
+- **Accounts reconciled without a bank file:** only bank-type accounts with a record in `FIN_MATCHING_ALGORITHM_ID` show `Import Statement` and `Match Statement`; cash accounts, and bank accounts without one, show `Reconcile` (`EM_APRM_RECONCILE`), opening the older `Reconciliation` screen, where the user ticks transactions as cleared without linking statement lines. A workbench tracking unmatched lines would miss these accounts (Section 2.1, rows 36 to 42; mixing ban, Section 4.4).
+- **Reopening an earlier period:** once an earlier reconciliation is force-reopened (Section 2.1, row 48), `Match Transactions Force` replaces `Match Statement`, working only on lines up to its end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
 
 **Requirement implications:** A workbench must start from processed statement lines per bank account, act on the draft `Match Statement` uses, and expect completed reconciliations to leave lines unmatched; accounts reconciled without a bank file need separate treatment (Section 1.3).
 
 ## 2. Manual User Actions and Their Triggers
 
-**What this section tells you:** Section 2.1 lists the 40 actions that need a person, with trigger, recurrence, volume sensitivity and automation potential (`modules/org.openbravo.advpaymentmngt`). Section 2.2 draws them as swimlanes (diagrams with one lane per actor) beside the system's steps. The actions repeated per statement line sit in `Match Statement` and set most of the effort.
+**What this section tells you:** Repeated line-level decisions create a different workload from one-time setup (Section 2.1). Distinguishing unavoidable judgment from steps the system can already perform lets requirements target the work that grows with the backlog.
 
 ### 2.1 Every Manual Action and What Drives It
 
-Frequency driver is the event that brings an action back; Data volume sensitivity (how work grows with volume) is High per line or transaction, Medium per statement, session or period, Low for rare corrections and None for one-time setup; real volumes are not determinable from code (Section 7). Could be automated is Yes when code already does or can skip the step, Partly when it does part, No when a person must judge.
+Frequency driver is the event that brings an action back. Data volume sensitivity (how work grows with volume) is High per line or transaction, Medium per statement, session or reconciliation, Low per corrected document or record, None for setup, unless a cell says otherwise; real volumes and correction rates are not determinable from code (Section 7). Could be automated is Yes if code does or can skip it, Partly if it does part, No if a person must judge.
 
-**Assumption:** users holding the standard Finance role (a named set of screen and process permissions), shown as Finance, perform every row except 1 (System Administrator), 2, 4 and 5 (windows this role may only view in `AD_WINDOW_ACCESS`), and 9 and 10 (windows no standard role is granted). **Unconfirmed:** which people hold that role, because role assignments are installation data (consulted `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml`, `AD_USER_ROLES`).
+**Assumption:** users holding the standard Finance role (a named set of screen and process permissions), shown as Finance, perform every row except 1 (System Administrator), 2, 3, 5 and 6 (windows it may only view, `AD_WINDOW_ACCESS`), and 10 and 11 (windows no standard role is granted). **Unconfirmed:** which people hold that role, because role assignments are installation data (consulted `modules/org.openbravo.v3.datasets/referencedata/standard/V3_Roles.xml`, `AD_USER_ROLES`).
 
 | Step | Who acts | Trigger | Window / class | Frequency driver | Data volume sensitivity | Could be automated |
 |------|----------|---------|----------------|------------------|-------------------------|--------------------|
-| 1. Install a bank file format module and apply its dataset (packaged setup data) | System Administrator | Import warns that no format is installed (`APRM_NoBankFileAvailableInfo`) | `ImportBankFile` | One-time setup | None: one-time | No: the message assigns it to administrators |
-| 2. Maintain words excluded from partner guessing | User with edit access | Partners guessed wrongly at import | `Bank File Format` (`FIN_BANKFILE_EXCEPTION`) | Setup, revisited after wrong guesses | Low: one list per format | Partly: the importer reuses earlier lines' partners (`FIN_BankStatementImport`); the list stays manual |
-| 3. Choose the account's matching algorithm record | Finance | New bank account or different matching wanted; until chosen, import and matching buttons stay hidden (`FIN_MATCHING_ALGORITHM_ID`) | `Financial Account` | One-time setup | None: one-time | No: a business choice |
-| 4. Edit a record's three on/off switches, changing every account that selects it | User with edit access | Matching too strict or too loose | `Matching Algorithm` (`FIN_MATCHING_ALGORITHM`) | Setup, revisited when results disappoint | Low: one record, many accounts | No: no match results are stored to tune from (Section 3.2) |
-| 5. Create a record naming a different rule program | User with edit access | A module with other rules is installed (`FIN_MatchingAlgorithm`) | `Matching Algorithm` (`CLASSNAME`) | One-time setup | None: one-time | No: the rules must first be written |
-| 6. Set, per payment method, whether payments create their transactions | Finance | Payments missing from matching candidates | `Payment Method` tab (`AUTOMATIC_DEPOSIT`, `AUTOMATIC_WITHDRAWN`) | One-time setup | None, but each method left off adds rows 18 and 24 per payment | No: the switch is what lets `FIN_PaymentProcess` automate this |
-| 7. Set the account's GL item for differences | Finance | Manual reconciliations book differences (row 29) | `Financial Account` (`EM_APRM_GLITEM_DIFF`) | One-time setup | None: one-time | No: an accounting choice |
-| 8. Set up posting: statement posting switch, cleared-item accounts, each method's clearing use | Finance | Posting creates no entries (Section 1.2) | `Accounting Configuration`, `Payment Method` (`ENABLEBANKSTATEMENT`, `INUPONCLEARINGUSE`) | One-time setup | None: one-time | No: accounting policy |
-| 9. Schedule background posting | User granted the `Process Request` window | Posting should run without a person | `Acct Server Process` (`AD_PROCESS_REQUEST`) | One-time setup | None: one-time | No: the schedule is the automation (Section 1.2) |
-| 10. Switch off the partial-match question (row 22) | User granted the `Preference` window | The question repeats at every split | `APRM_MATCHSTATEMENT_HIDE_PARTIALMATCH_POPUP`, a preference | One-time setup | None: one-time | No: a display choice |
-| 11. Import the bank file | Finance | Statement received from the bank | `Financial Account` (`EM_APRM_IMPORTBANKFILE`), `ImportBankFile` | Per statement | Medium: one upload per file | Partly: reading and processing run alone after upload (`FIN_BankStatementImport`); no code fetches files |
-| 12. Enter or correct a statement and its lines by hand | Finance | No file, or file rejected (`APRM_InvalidOrMissingValues`) | `Imported Bank Statements`, `Bank Statement Lines` | Per statement without a usable file | High: per line | Partly: a format module reads files instead (row 1) |
-| 13. Process a hand-entered statement | Finance | Statement complete | `EM_APRM_PROCESS_BS`, `FIN_BankStatementProcess` | Per hand-entered statement | Medium: per statement | Yes: import already processes what it creates (`FIN_BankStatementImport`) |
-| 14. Force-process a statement despite earlier dates | Finance | Date warning (`APRM_BankStatementLineWrongDateWarning`) with a matched line or later-dated account line (`APRM_ISRECONCILED`) | `EM_APRM_PROCESS_BS_FORCE`, `FIN_BankStatementProcess` | Per warned statement | Medium: per statement | Partly: a fixed date rule only a person overrides (Section 4.4) |
-| 15. Open Match Statement | Finance | Statement processed; shown for bank accounts with a record and no older draft | `Financial Account` (`EM_APRM_MATCHTRANSACTIONS`), `Match Statement` | Per opening of Match Statement | Medium: per session | Partly: draft handling and matching are programs only this screen starts (`MatchStatementOnLoadActionHandler`) |
-| 16. Accept or decline the automatic matching run | Finance | Prompt at every opening (`APRM_AlgorithmConfirm`) | `Match Statement` | Per opening of Match Statement | Medium: per session | Yes: the prompt only gates a program needing no input (Section 3.3) |
-| 17. Dismiss the immediate-save notice for good | Finance | Notice at every opening until dismissed (`APRM_GRID_PERSIST_MESSAGE`) | `MatchStatementOnLoadPreferenceActionHandler` (`APRM_NoPersistInfoMessageInMatching`) | Once per user | None: once per person | No: a personal choice |
-| 18. Add several payments to the account as transactions | Finance | Payments lack transactions (row 6) | `Add Multiple Payments`, `AddMultiplePaymentsHandler` | Per batch of payments | Medium: one run, many payments | Partly: unneeded where row 6 applies (`FIN_PaymentProcess`) |
-| 19. Enter and process a transaction by hand | Finance | An amount, such as a fee, must exist before matching | `Transaction` tab (`EM_APRM_PROCESSED`), `FIN_TransactionProcess` | Per transaction | High: per amount | Partly: as row 23 |
-| 20. Set or correct a processed line's GL item or partner | Finance | Line unmatched for want of a GL item (Section 3.1) | `Bank Statement Lines` (`C_GLITEM_ID`, `C_BPARTNER_ID`, still editable under `APRM_FIN_BNKSTM_LINE_CHECK_TRG`) | Per unmatched line | High: per line | Partly: later imports copy both from lines with the same name (`FIN_BankStatementImport`) |
-| 21. Search for and link transactions, splitting the line when amounts differ | Finance | Line left unmatched | `Find Transactions to Match`, `FindTransactionsToMatchActionHandler`, `APRM_MatchingUtility` | Per unmatched line | High: per line | Partly: code lists candidates but ranks none (Section 3.3) |
-| 22. Answer the partial-match question (whether to split the line) | Finance | Chosen amount differs from the line (`APRM_SplitBankStatementLineConfirm`) | `Find Transactions to Match`, `Add Transaction` | Per split | High: per split line | Yes: row 10 removes it |
-| 23. Add and link a bank-fee or GL-item transaction | Finance | No transaction exists for the line | `Add Transaction`, `AddTransactionActionHandler` | Per unmatched line | High: per line | Partly: plugged-in rules may create them (`CREATEDBYALGORITHM`); standard rules create none (`StandardMatchingAlgorithm`) |
-| 24. Link an existing payment through Add Transaction | Finance | Payment has no transaction | `Add Transaction`, `AddTransactionActionHandler` | Per unmatched line | High: per line | Partly: unneeded where row 6 applies (`FIN_PaymentProcess`) |
-| 25. Create a new payment from Add Transaction | Finance | The money has no payment in the ERP | `Add Payment` (`OBUISEL_AddNewRecord`) | Per unmatched line | High: per line | Partly: only plugged-in rules could create payments (`CREATEDBYALGORITHM`, `FIN_PAYMENT`) |
-| 26. Unmatch a wrong match, one row or a selection | Finance | Link judged wrong; only the Affinity column (the grid's match-strength code) flags looser matches | `Match Statement P&E`, `UnMatchTransactionActionHandler`, `UnMatchSelectedTransactionsActionHandler` | Per wrong match | High: per matched line | No: nothing in code marks a link as wrong (Section 3.3) |
-| 27. Reconcile with Reconcile All | Finance | Matching finished for the period | `Match Statement`, `MatchStatementActionHandler` | Per period | Medium: per period | Partly: completion is one program call (Section 1.2); only the decision is manual |
-| 28. Leave the draft open with OK | Finance | Work to continue later | `MatchStatementActionHandler` | Per opening of Match Statement | Low: per session | Yes: OK changes nothing, as grid changes are already saved (`APRM_GRID_PERSIST_MESSAGE`) |
-| 29. Reconcile without a statement: enter date, ending balance and any difference for row 7's GL item; save or process | Finance | Cash account, or account with no record, the only cases the button shows | `Financial Account` (`EM_APRM_RECONCILE`), `Reconciliation` | Per period | Medium: per period | No: no statement lines exist to compare, and an unbooked difference is refused (`APRM_ReconciliationDiscrepancy`) |
-| 30. Tick each cleared transaction | Finance | Manual reconciliation open | `Reconciliation` | Per transaction, each tick saved at once | High: per transaction | No: as row 29 |
-| 31. Reactivate (reopen for editing) a statement or the latest reconciliation | Finance | Error found after completion; refusals in Section 4.4 | `FIN_BankStatementProcess`, `FIN_ReconciliationProcess` | Per correction | Low: rare | No: a person decides what to correct |
-| 32. Unpost a reconciliation or statement | Finance | Reactivation refused while posted (`PostedDocument`) | `Posted` button, `ResetAccounting` | Per correction after posting | Low: rare | No: a person decides to undo the books |
-| 33. Force-reactivate a statement with a matched line | Finance | Reactivation refused (`APRM_BSLineReconciled`) | `EM_APRM_PROCESS_BS_FORCE` | Per correction | Low: rare | No: as row 31 |
-| 34. Force-reactivate an earlier reconciliation that later ones follow | Finance | Correction in a processed, non-latest, non-manual reconciliation, the only case the button shows | `Reconciliation Process Force` | Per correction | Low: rare | No: as row 31 |
-| 35. Re-match that earlier draft | Finance | The open draft is not the latest, which hides row 15's button | `Match Transactions Force` (`EM_APRM_MATCHTRANS_FORCE`) | Per forced correction | Low: rare | No: follows row 34 |
-| 36. Delete a wrong, unprocessed statement | Finance | Duplicate or wrong file, after row 31; processed statements cannot be deleted (`APRM_FIN_BANK_STMT_CHECK_TRG`) | `Imported Bank Statements` | Per wrong import | Low: rare | No: a person judges the file wrong |
-| 37. Delete a draft or later reconciliation | Finance | A later reconciliation blocks a correction (`APRM_FutureReconciliationExists`) | `Reconciliations` (`APRM_FIN_RECON_CHECK_TRG`) | Per correction | Low: rare | No: as row 31 |
-| 38. Print the reconciliation details or summary | Finance | Printout needed | `ReportReconciliationDetail`, `ReportReconciliationSummary` | Per reconciliation | Low: per printout | Partly: code builds the report (`ReportReconciliation`); only a button starts it |
-| 39. Post the reconciliation | Finance | Completed reconciliation not yet posted | `Posted` button, `DocFINReconciliation` | Per reconciliation | Medium: per period | Yes: `Acct Server Process` posts it once scheduled (row 9), unless switched off (`ISBACKGROUNDDISABLED`) |
-| 40. Post the bank statement | Finance | Processed statement, with statement posting on (row 8) | `Posted` button, `DocFINBankStatement` | Per statement | Medium: per statement | Yes: as row 39 |
+| 1. Install a format module and apply its dataset (packaged setup data) | System Administrator | No format installed (`APRM_NoBankFileAvailableInfo`) | `ImportBankFile` | Setup | None | No: assigned to administrators |
+| 2. Maintain a format's program and availability | User with edit access | Program missing (`APRM_WrongBankFileFormat`) or format withdrawn | `Bank File Format` (`CLASSNAME`, `ISACTIVE`) | Setup, revisited | Low | No: a person picks each format's program (`ImportBankFile`) |
+| 3. Maintain words excluded from partner guessing | User with edit access | Partners guessed wrongly | `Bank File Format` (`FIN_BANKFILE_EXCEPTION`) | Setup, revisited | Low | Partly: import reuses earlier lines' partners (`FIN_BankStatementImport`) |
+| 4. Choose the account's matching algorithm record | Finance | New account or new rules (Section 1.1) | `Financial Account` (`FIN_MATCHING_ALGORITHM_ID`) | Setup | None | No: a business choice |
+| 5. Edit a record's three switches, affecting every account using it | User with edit access | Matching too strict or loose | `Matching Algorithm` (`FIN_MATCHING_ALGORITHM`) | Setup, revisited | Low | No: nothing tunes them or records whether stored matches (`MATCHINGTYPE`) were right (Section 3.2) |
+| 6. Name another rule program in a record | User with edit access | Module with other rules installed (`FIN_MatchingAlgorithm`) | `Matching Algorithm` (`CLASSNAME`) | Setup | None | No: rules must first be written |
+| 7. Set which payment methods create transactions | Finance | Payments missing from candidates | `Payment Method` (`AUTOMATIC_DEPOSIT`, `AUTOMATIC_WITHDRAWN`) | Setup | None; methods left off add rows 20 and 29 | No: this switch lets `FIN_PaymentProcess` automate it |
+| 8. Set the account's GL item for differences | Finance | Manual differences (row 41) | `Financial Account` (`EM_APRM_GLITEM_DIFF`) | Setup | None | No: an accounting choice |
+| 9. Set up posting switches, accounts and clearing use | Finance | No entries created (Section 1.2) | `Accounting Configuration`, `Payment Method` (`ENABLEBANKSTATEMENT`, `INUPONCLEARINGUSE`) | Setup | None | No: accounting policy |
+| 10. Schedule background posting | User granted `Process Request` | Posting should run unattended | `Acct Server Process` (`AD_PROCESS_REQUEST`) | Setup | None | No: the schedule is the automation |
+| 11. Switch off the partial-match question (row 31) | User granted `Preference` | Question at every split | `Preference` (`APRM_MATCHSTATEMENT_HIDE_PARTIALMATCH_POPUP`) | Setup | None | No: a display choice |
+| 12. Import the bank file | Finance | Statement received | `Financial Account` (`EM_APRM_IMPORTBANKFILE`), `ImportBankFile` | Per statement | Medium | Partly: processing follows upload (`FIN_BankStatementImport`); nothing fetches files |
+| 13. Enter or correct a statement by hand | Finance | No file, or file rejected (`APRM_InvalidOrMissingValues`) | `Imported Bank Statements`, `Bank Statement Lines` | Per hand-entered statement | High | Partly: a format module avoids it (row 1) |
+| 14. Delete a wrong line of an unprocessed statement | Finance | Wrong line; if processed, row 43 first | `Bank Statement Lines` (`APRM_FIN_BNKSTM_LINE_CHECK_TRG`) | Per wrong line | High | No: a person judges |
+| 15. Process a hand-entered statement | Finance | Statement complete | `EM_APRM_PROCESS_BS`, `FIN_BankStatementProcess` | Per hand-entered statement | Medium | Yes: import processes what it creates (`FIN_BankStatementImport`) |
+| 16. Force-process despite earlier dates | Finance | Date warning (Section 4.4); shown only if `APRM_ISRECONCILED` finds a matched or later line | `EM_APRM_PROCESS_BS_FORCE`, `FIN_BankStatementProcess` | Per warned statement | Medium | Partly: a person overrides; if hidden, only fixing dates helps (row 13) |
+| 17. Open Match Statement | Finance | Statement processed (Sections 1.1 and 1.3) | `Financial Account` (`EM_APRM_MATCHTRANSACTIONS`), `Match Statement` | Per opening | Medium | Partly: matching waits for this screen (Section 1.2) |
+| 18. Accept or decline automatic matching | Finance | Prompt at every opening (`APRM_AlgorithmConfirm`) | `Match Statement` | Per opening | Medium | Yes: the run needs no input |
+| 19. Dismiss the immediate-save notice for good | Finance | Notice at every opening (`APRM_GRID_PERSIST_MESSAGE`) | `Match Statement` (`APRM_NoPersistInfoMessageInMatching`) | Once per user | None | No: a personal choice |
+| 20. Add several payments as transactions | Finance | Payments lack transactions (row 7) | `Add Multiple Payments`, `AddMultiplePaymentsHandler` | Per batch | Medium: one run | Partly: unneeded where row 7 applies (`FIN_PaymentProcess`) |
+| 21. Enter a transaction by hand | Finance | A fee or other amount is missing | `Transaction` tab | Per transaction | High | Partly: as row 27 |
+| 22. Process that transaction | Finance | Row 21 done | `EM_APRM_PROCESSED`, `FIN_TransactionProcess` | Per transaction | High | Partly: as row 27 |
+| 23. Reactivate (reopen for editing) a transaction | Finance | Error; refused once posted (`PostedDocument`) or cleared (`APRM_ReconciledDocument`) | `FIN_TransactionProcess` | Per correction | Low | No: a person decides |
+| 24. Correct a processed line's GL item or partner | Finance | GL item missing (Section 3.1) | `Bank Statement Lines` (`C_GLITEM_ID`, `C_BPARTNER_ID`, editable under `APRM_FIN_BNKSTM_LINE_CHECK_TRG`) | Per unmatched line | High | Partly: later imports copy both from same-name lines (`FIN_BankStatementImport`) |
+| 25. Search and link, splitting the line if needed | Finance | Line left unmatched | `Find Transactions to Match`, `FindTransactionsToMatchActionHandler`, `APRM_MatchingUtility` | Per unmatched line | High | Partly: candidates listed, not ranked (Section 3.3) |
+| 26. Remove the search's default date filter | Finance | Candidate dated after the line (Section 3.1) | `TransactionsToMatchTransformer` | Per unmatched line | High | No: no setting removes it |
+| 27. Add and link a bank-fee transaction | Finance | No transaction exists | `Add Transaction`, `AddTransactionActionHandler` | Per unmatched line | High | Partly: plugged-in rules may (`CREATEDBYALGORITHM`); standard ones do not (`StandardMatchingAlgorithm`) |
+| 28. Add and link a GL-item transaction | Finance | As row 27 | `AddTransactionActionHandler` | Per unmatched line | High | Partly: as row 27 |
+| 29. Link an existing payment instead | Finance | Payment has no transaction | `AddTransactionActionHandler` | Per unmatched line | High | Partly: unneeded where row 7 applies |
+| 30. Create a payment instead | Finance | The money has no payment | `Add Payment` (`OBUISEL_AddNewRecord`) | Per unmatched line | High | Partly: only plugged-in rules could (`CREATEDBYALGORITHM`, `FIN_PAYMENT`) |
+| 31. Answer the partial-match question: Yes splits, No links nothing | Finance | Chosen amount differs | `Find Transactions to Match`, `Add Transaction` (`APRM_SplitBankStatementLineConfirm`) | Per split | High | Yes: row 11 removes it |
+| 32. Unmatch one wrong match | Finance | Wrong link; only the Affinity column (the grid's match-strength code) flags looser matches | `Match Statement P&E`, `UnMatchTransactionActionHandler` | Per wrong match | High | No: nothing flags a wrong link (Section 3.3) |
+| 33. Unmatch several at once | Finance | As row 32 | `UnMatchSelectedTransactionsActionHandler` | Per batch | Medium: one run | No: as row 32 |
+| 34. Reconcile with Reconcile All | Finance | Matching finished for the period | `Match Statement`, `MatchStatementActionHandler` | Per period | Medium | Partly: the system performs the completion checks; a person decides when the period is ready (Section 1.2) |
+| 35. Leave the draft open with OK | Finance | Work to continue later | `MatchStatementActionHandler` | Per opening | Medium | Yes: OK changes nothing; changes are already saved (`APRM_GRID_PERSIST_MESSAGE`) |
+| 36. Reconcile by hand: date, ending balance, difference; save a draft | Finance | Account without matching (Section 1.3) | `Financial Account` (`EM_APRM_RECONCILE`), `Reconciliation` | Per period | Medium | No: no statement lines are compared; a person supplies balance and cleared items |
+| 37. Tick each cleared transaction | Finance | Manual reconciliation open | `Reconciliation` | Per transaction; each tick saves at once | High | No: as row 36 |
+| 38. Clear all: tick or untick every listed transaction | Finance | All cleared, or none | `Reconciliation` (`inpClearAll`) | Per reconciliation | Medium: one tick | Partly: one tick for all; a person still judges |
+| 39. Hide cleared transactions | Finance | Only open items wanted | `Reconciliation` (`inpHideCleared`) | Per reconciliation | Medium: one tick | No: a display choice |
+| 40. Show transactions dated after the statement date | Finance | Later-dated cleared item, hidden by default | `Reconciliation` (`inpAfterDate`) | Per reconciliation | Medium: one tick | No: a person picks; processing redates them to the statement date (`APRM_DateWillBeUpdated`) |
+| 41. Process the manual reconciliation | Finance | Items ticked; dates and period checked, difference booked (row 8) | `Reconciliation` (`APRM_ReconciliationDiscrepancy`) | Per period | Medium | No: as row 36; an unbooked difference is refused |
+| 42. Cancel the manual screen | Finance | Work to stop | `Reconciliation` (`buttonCancel`) | Per opening | Medium | Yes: nothing changes; saved ticks stay in the draft |
+| 43. Reactivate a statement | Finance | Error after completion; refusals in Section 4.4 | `Imported Bank Statements`, `FIN_BankStatementProcess` | Per correction | Low | No: as row 23 |
+| 44. Reactivate the latest reconciliation | Finance | As row 43; blocked by another open draft | `Reconciliations`, `FIN_ReconciliationProcess` | Per correction | Low | No: as row 23 |
+| 45. Unpost a statement | Finance | Reactivation refused while posted (`PostedDocument`) | `Posted` button, `ResetAccounting` | Per correction | Low | No: as row 23 |
+| 46. Unpost a reconciliation | Finance | As row 45 | `Posted` button, `ResetAccounting` | Per correction | Low | No: as row 23 |
+| 47. Force-reactivate a statement with a matched line | Finance | Reactivation refused (`APRM_BSLineReconciled`) | `EM_APRM_PROCESS_BS_FORCE` | Per correction | Low | No: as row 23 |
+| 48. Force-reactivate an earlier reconciliation | Finance | Earlier, non-manual reconciliation needs correcting, the only case shown | `Reconciliation Process Force` | Per correction | Low | No: as row 23 |
+| 49. Re-match that earlier draft | Finance | Row 48 done (Section 1.3) | `Match Transactions Force` (`EM_APRM_MATCHTRANS_FORCE`) | Per correction | Low | No: follows row 48 |
+| 50. Delete a wrong, unprocessed statement | Finance | Duplicate or wrong file; if processed, row 43 first | `Imported Bank Statements` (`APRM_FIN_BANK_STMT_CHECK_TRG`) | Per wrong import | Low | No: a person judges |
+| 51. Delete an unprocessed reconciliation | Finance | A later one blocks a correction; if completed, first unpost (row 46) and reactivate it (row 44) | `Reconciliations` (`APRM_FIN_RECON_CHECK_TRG`, `APRM_FutureReconciliationExists`) | Per correction | Low | No: as row 23 |
+| 52. Print the reconciliation details | Finance | Printout needed | `ReportReconciliationDetail` | Per reconciliation | Medium, listing every outstanding item and unreconciled line (`ReportReconciliation`) | Partly: only the start is manual |
+| 53. Print the reconciliation summary | Finance | Printout needed | `ReportReconciliationSummary` | Per reconciliation | Medium, as row 52 in totals | Partly: as row 52 |
+| 54. Post the reconciliation | Finance | Completed, not yet posted | `Posted` button, `DocFINReconciliation` | Per reconciliation | Medium | Yes: `Acct Server Process` posts it once scheduled (row 10), unless disabled (`ISBACKGROUNDDISABLED`) |
+| 55. Post the bank statement | Finance | Statement processed, posting on (row 9) | `Posted` button, `DocFINBankStatement` | Per statement | Medium | Yes: as row 54 |
 
-Effort comes from the recurring rows: per statement or session, rows 11, 15 and 16 (`ImportBankFile`, `APRM_AlgorithmConfirm`); per line the rules never match, rows 20 to 25 (`FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler`); per wrong match, row 26; per transaction ticked, row 30; and per period, rows 27 and 29 (`MatchStatementActionHandler`). The rest are setup, corrections, printing and posting; a schedule can take over posting (row 9), and Appendix B lists buttons left out.
+Automation should target how often a person intervenes (Frequency driver), not how many buttons exist (`Match Statement`); Appendix B lists buttons left out.
 
 ### 2.2 Swimlanes of Manual Touchpoints
 
-Figure 4 shows setup, Figure 5 import, Figure 6 matching and Figure 7 corrections, each manual touchpoint a bold box naming its Section 2.1 rows once. Every arrow back into the user lane, such as an unmatched line (`Match Statement`) or a refusal (`PostedDocument`), is manual effort.
+Figure 4, Figure 5, Figure 6 and Figure 7 use swimlanes (diagrams with one lane per actor); shaded, heavy-outlined boxes are manual steps naming their Section 2.1 rows, and arrows back to people are further interventions (`Match Statement`, `PostedDocument`).
 
 **Figure 4. Swimlane of Setup Actions**
 
 ```mermaid
 flowchart LR
+  accTitle: Figure 4. Swimlane of Setup Actions
+  accDescr: Setup steps and what each enables.
   subgraph People["Finance user or administrator"]
-    M1["Rows 1-2: install a format module, keep exclusion words (Bank File Format)"]
-    M3["Rows 3-5: choose, tune or replace the rules (Matching Algorithm)"]
-    M6["Row 6: decide which payments create transactions (Payment Method)"]
-    M7["Row 7: set the difference GL item (GL Item Difference)"]
-    M8["Rows 8-9: set up and schedule posting (Accounting Configuration, Process Request)"]
-    M10["Row 10: switch off the partial-match question (Preference)"]
+    M4["Rows 4-6: matching rules (Matching Algorithm)"]
+    M7["Rows 7-8: payment and difference options (Payment Method)"]
+    M1["Rows 1-3: file formats (Bank File Format)"]
+    M9["Rows 9-10: posting and its schedule (Process Request)"]
+    M11["Row 11: hide the partial-match question (Preference)"]
   end
   subgraph System["System"]
-    S1["Reads files, guesses partners (FIN_BankStatementImport)"]
-    S2["Shows matching buttons, applies the rules (StandardMatchingAlgorithm)"]
-    S3["Creates a transaction per payment (FIN_PaymentProcess)"]
-    S4["Books the difference (Reconciliation)"]
-    S5["Posts on request or schedule (Acct Server Process)"]
-    S6["Splits without asking (Find Transactions to Match, Add Transaction)"]
+    S1["Reads files, guesses partners"]
+    S2["Applies the rules"]
+    S3["Creates transactions, books differences"]
+    S4["Posts on schedule"]
+    S5["Splits without asking"]
   end
-  M1 --> S1
-  M3 --> S2
-  M6 --> S3
-  M7 --> S4
-  M8 --> S5
-  M10 --> S6
-  classDef manual stroke-width:3px
-  class M1,M3,M6,M7,M8,M10 manual
+  M1-->S1
+  M4-->S2
+  M7-->S3
+  M9-->S4
+  M11-->S5
+  style People fill:#fdf4ff,stroke:#86198f,stroke-width:2px
+  style System fill:#f0fdfa,stroke:#0f766e,stroke-width:2px
+  classDef manual fill:#dbeafe,stroke:#1e3a8a,stroke-width:4px
+  class M1,M4,M7,M9,M11 manual
 ```
 
-**How to read this:** Bold boxes are manual setup steps, and each arrow points to the behaviour it enables.
+**How to read this:** Manual steps (shaded, left) each enable a system step (right).
 
 **Figure 5. Swimlane of Import and Opening**
 
 ```mermaid
-flowchart TB
+flowchart LR
+  accTitle: Figure 5. Swimlane of Import and Opening
+  accDescr: Statements are imported, checked and opened.
   subgraph People["Finance user"]
-    M11["Row 11: import the file (ImportBankFile)"]
-    M12["Rows 12-13: enter, fix and process a statement (Imported Bank Statements)"]
-    M14["Row 14: force-process (Bank Statement Process Force)"]
-    M15["Rows 15-16: open Match Statement, answer the prompt (APRM_AlgorithmConfirm)"]
-    M17["Row 17: dismiss the save notice (APRM_GRID_PERSIST_MESSAGE)"]
-    M18["Rows 18-19: add payments or transactions first (Add Multiple Payments)"]
-    M20["Row 20: set a line's GL item or partner (Bank Statement Lines)"]
+    M19["Row 19: dismiss the save notice (APRM_GRID_PERSIST_MESSAGE)"]
+    M20["Rows 20-23: prepare transactions (FIN_TransactionProcess)"]
+    M17["Rows 17-18: open the matching screen and answer the prompt (Match Statement, APRM_AlgorithmConfirm)"]
+    M16["Row 16: force-process (Bank Statement Process Force)"]
+    M24["Row 24: set a line's GL item (Bank Statement Lines)"]
+    M12["Row 12: import the file (ImportBankFile)"]
+    M13["Rows 13-15: enter, fix, delete, process (Bank Statement Lines)"]
   end
   subgraph System["System"]
-    S1["Reads the file, creates lines (FIN_BankStatementImport)"]
-    S2["Checks dates, processes (FIN_BankStatementProcess)"]
-    S3["Warns, leaves unprocessed (APRM_BankStatementLineWrongDateWarning)"]
-    S4["Prepares the draft, runs the rules if accepted (MatchStatementOnLoadActionHandler)"]
-    S5["Shows the lines (Match Statement)"]
+    S1["Reads the file, checks dates, processes"]
+    S2["Prepares the draft, matches if accepted, shows lines"]
   end
-  M11 --> S1
-  S1 -->|"rejected"| M12
-  S1 --> S2
-  M12 --> S2
-  S2 -->|"earlier dates"| S3
-  S3 -->|"fix dates"| M12
-  S3 -->|"if offered"| M14
-  S2 -->|"processed"| M15
-  M14 --> M15
-  M15 -->|"notice"| M17
-  M15 --> S4
-  M18 -->|"candidates"| S4
-  S4 --> S5
-  S5 -->|"no GL item"| M20
-  M20 -->|"next opening"| M15
-  classDef manual stroke-width:3px
-  class M11,M12,M14,M15,M17,M18,M20 manual
+  M12-->S1
+  M13<-->|"rejected or misdated: fix"|S1
+  M16<-->|"force, if shown"|S1
+  M17-->|"once processed"|S2
+  M19<-->|notice|S2
+  M20-->|candidates|S2
+  M24<-->|"no GL item: next opening"|S2
+  style People fill:#fdf4ff,stroke:#86198f,stroke-width:2px
+  style System fill:#f0fdfa,stroke:#0f766e,stroke-width:2px
+  classDef manual fill:#dbeafe,stroke:#1e3a8a,stroke-width:4px
+  class M12,M13,M16,M17,M19,M20,M24 manual
 ```
 
-**How to read this:** Bold boxes are manual steps, and arrow labels name the condition that hands work back.
+**How to read this:** Manual steps (left) feed system steps (right); double arrows show work handed back.
 
 **Figure 6. Swimlane of Matching and Closing**
 
 ```mermaid
 flowchart LR
-  subgraph System["System"]
-    S1["Line left unmatched (Match Statement)"]
-    S2["Link saved at once, split if amounts differ (APRM_MatchingUtility)"]
-    S3["Link removed, parts merged (APRM_MatchingUtility)"]
-    S4["Periods checked, completed (FIN_ReconciliationProcess)"]
-    S5["Difference, dates, period checked (Reconciliation)"]
-  end
+  accTitle: Figure 6. Swimlane of Matching and Closing
+  accDescr: Lines are linked, then reconciled.
   subgraph People["Finance user"]
-    M21["Row 21: search and link (Find Transactions to Match)"]
-    M22["Row 22: answer the partial-match question (APRM_SplitBankStatementLineConfirm)"]
-    M23["Rows 23-25: add a transaction or payment (Add Transaction, Add Payment)"]
-    M26["Row 26: unmatch (UnMatchSelectedTransactionsActionHandler)"]
-    M27["Rows 27-28: Reconcile All, or OK to leave the draft (MatchStatementActionHandler)"]
-    M29["Rows 29-30: reconcile by ticking items (Reconciliation)"]
+    M31["Row 31: answer the partial-match question (APRM_SplitBankStatementLineConfirm)"]
+    M32["Rows 32-33: unmatch (UnMatchSelectedTransactionsActionHandler)"]
+    M27["Rows 27-30: add a transaction (Add Transaction)"]
+    M34["Rows 34-35: Reconcile All or OK (MatchStatementActionHandler)"]
+    M25["Rows 25-26: search, removing the date filter if needed"]
+    M36["Rows 36-42: reconcile by ticking items (Reconciliation)"]
   end
-  S1 --> M21
-  S1 --> M23
-  M21 -->|"amounts differ"| M22
-  M23 -->|"amounts differ"| M22
-  M22 --> S2
-  M21 -->|"equal"| S2
-  M23 -->|"equal"| S2
-  S2 -->|"wrong"| M26
-  M26 --> S3
-  S3 --> S1
-  S2 -->|"period done"| M27
-  M27 -->|"Reconcile All"| S4
-  M29 --> S5
-  classDef manual stroke-width:3px
-  class M21,M22,M23,M26,M27,M29 manual
+  subgraph System["System"]
+    S1["Line stays unmatched"]
+    S2["Compares amounts; links, splitting if needed"]
+    S3["Removes the link; line unmatched again"]
+    S4["Checks periods, completes"]
+    S5["Checks the difference"]
+  end
+  M25-->S2
+  M27-->S2
+  S2-->|"amounts differ"|M31
+  M31-->|Yes|S2
+  M31-->|"No: nothing saved"|S1
+  M32-->S3
+  M34-->|"Reconcile All"|S4
+  M36-->S5
+  style People fill:#fdf4ff,stroke:#86198f,stroke-width:2px
+  style System fill:#f0fdfa,stroke:#0f766e,stroke-width:2px
+  classDef manual fill:#dbeafe,stroke:#1e3a8a,stroke-width:4px
+  class M25,M27,M31,M32,M34,M36 manual
 ```
 
-**How to read this:** Bold boxes are manual steps, and the unmatch loop returns a wrong link to unmatched.
+**How to read this:** Manual steps (left) feed system steps (right); at the split question, No saves nothing.
 
 **Figure 7. Swimlane of Corrections, Printing and Posting**
 
 ```mermaid
 flowchart LR
+  accTitle: Figure 7. Swimlane of Corrections, Printing and Posting
+  accDescr: Refusals lead to corrections.
   subgraph People["Finance user"]
-    M31["Row 31: reactivate a statement or latest reconciliation (EM_APRM_PROCESS_BS, EM_APRM_PROCESS_REC)"]
-    M32["Row 32: unpost first (ResetAccounting)"]
-    M33["Rows 33-34: force-reactivate (Bank Statement Process Force, Reconciliation Process Force)"]
-    M35["Row 35: re-match the earlier draft (Match Transactions Force)"]
-    M36["Rows 36-37: delete a wrong statement or reconciliation (Imported Bank Statements, Reconciliations)"]
-    M38["Row 38: print details or summary (Reconciliations)"]
-    M39["Rows 39-40: post (Posted)"]
+    M43["Rows 43-46: unpost if posted, reactivate (Reconciliations)"]
+    M47["Rows 47-48: force-reactivate if matched or earlier (Reconciliation Process Force)"]
+    M49["Row 49: re-match the earlier draft (Match Transactions Force)"]
+    M50["Rows 50-51: delete a document once unprocessed"]
+    M52["Rows 52-53: print (ReportReconciliation)"]
+    M54["Rows 54-55: post (Posted)"]
   end
   subgraph System["System"]
-    S1["Refuses while posted (PostedDocument)"]
-    S2["Refuses: matched line or later one (APRM_BSLineReconciled, APRM_FutureReconciliationExists)"]
-    S3["Reopens the document (FIN_BankStatementProcess, FIN_ReconciliationProcess)"]
-    S4["Creates entries (DocFINReconciliation, DocFINBankStatement)"]
-    S5["Prints (ReportReconciliationDetail, ReportReconciliationSummary)"]
+    S1["Reopens unless posted, matched, later one or open draft"]
+    S6["Reopens despite matched lines or later ones"]
+    S4["Matches up to its end date"]
+    S5["Refuses deletion while processed (APRM_FIN_RECON_CHECK_TRG)"]
+    S2["Prints the report"]
+    S3["Creates the entries"]
   end
-  M31 -->|"posted"| S1
-  S1 --> M32
-  M32 --> M31
-  M31 -->|"matched or later"| S2
-  S2 -->|"force"| M33
-  S2 -->|"later one"| M36
-  M31 -->|"allowed"| S3
-  M33 --> S3
-  S3 -->|"earlier one reopened"| M35
-  S3 -->|"wrong statement"| M36
-  M38 --> S5
-  M39 --> S4
-  classDef manual stroke-width:3px
-  class M31,M32,M33,M35,M36,M38,M39 manual
+  M43<-->|"later one: reopen and delete it first"|S1
+  M47-->S6
+  M49-->S4
+  M50-->S5
+  M52-->S2
+  M54-->S3
+  style People fill:#fdf4ff,stroke:#86198f,stroke-width:2px
+  style System fill:#f0fdfa,stroke:#0f766e,stroke-width:2px
+  classDef manual fill:#dbeafe,stroke:#1e3a8a,stroke-width:4px
+  class M43,M47,M49,M50,M52,M54 manual
 ```
 
-**How to read this:** Bold boxes are manual steps, and arrows from a refusal lead to the correction it forces.
+**How to read this:** Manual steps (left) feed system steps (right); double arrows are refusals forcing a correction.
 
-**Requirement implications:** A workbench cuts the most effort by removing the line-level actions (rows 20 to 26) and the per-session prompt (row 16) and by using the switches that already automate steps (rows 6, 9 and 10), not by adding setup or correction screens (`Match Statement`, `FIN_PaymentProcess`).
+**Requirement implications:** Removing line-level actions (rows 24-33) and the per-session prompt (row 18), and using automation switches (rows 7, 10 and 11), saves more than new setup or correction screens (`Match Statement`, `FIN_PaymentProcess`).
 
 ## 3. Existing Matching Logic
 
@@ -679,8 +685,8 @@ Each technical term as defined at its first use.
 
 Supports Section 2.1: flow buttons and checks with no row of their own, and why.
 
-- `Funds Transfer` (`EM_APRM_FUNDS_TRANS`) moves money between accounts, creating candidates rather than resolving lines, and transaction posting from the `Transaction` tab and the older `C_BANKSTATEMENT` window lie outside this flow.
-- Hidden columns `EM_APRM_ADDTRANSACTIONPD` and `EM_APRM_FINDTRANSACTIONSPD` only hold the process definitions of the search and add actions (Section 2.1, rows 21 and 23 to 25), and `EM_APRM_PROCESS_RECONCILIATION` is never shown.
+- `Funds Transfer` (`EM_APRM_FUNDS_TRANS`) moves money between accounts, creating candidates rather than resolving lines, and transaction posting from the `Transaction` tab lies outside this flow.
+- Hidden columns `EM_APRM_ADDTRANSACTIONPD` and `EM_APRM_FINDTRANSACTIONSPD` only hold the process definitions of the search and add actions (Section 2.1, rows 25 and 27 to 30), and `EM_APRM_PROCESS_RECONCILIATION` is never shown.
 - The stale-line check (`CheckRecordChangedActionHandler`) has no row because it only refuses an action on a line someone else changed; Section 4.4 traces it.
 
 ## Appendix C. Further Checks That Interrupt Exception Work
