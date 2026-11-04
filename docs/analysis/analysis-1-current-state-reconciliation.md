@@ -63,7 +63,7 @@ flowchart TD
    - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE`, partners in `C_BPARTNER` and excluded words in `FIN_BANKFILE_EXCEPTION`; writes partner and GL item on new lines.
    - **User sees:** nothing; the final message counts only inserted lines (`RowsInserted`), dropping the prepared zero-amount note (`APRM_ZeroAmountNotInserted`).
 4. **Process the statement at once.**
-   - **What happens:** The import processes the statement at once for matching (`FIN_AddPayment`). A line dated on or before the latest line of earlier processed statements (or, if none, the last reconciliation's end date) leaves it unprocessed until dates are corrected (`FIN_BankStatementProcess`). Force-processing is offered only if a line here is matched or the account has a line dated after this statement's last (`APRM_ISRECONCILED`), so it may be unavailable (Section 2.1, row 16).
+   - **What happens:** The import processes the statement at once (`FIN_AddPayment`). A line dated on or before the latest processed line (or, if none, the last reconciliation's end date) leaves it unprocessed (`FIN_BankStatementProcess`). Force-processing (processing despite the date check) may be unavailable (Section 2.1, row 16).
    - **Done by:** `FIN_AddPayment`, which runs `FIN_BankStatementProcess`.
    - **Tables:** reads earlier lines in `FIN_BANKSTATEMENTLINE` and the last completed reconciliation in `FIN_RECONCILIATION`; writes the processed flag on `FIN_BANKSTATEMENT`.
    - **User sees:** the statement number and lines inserted (`APRM_BankStatementNo`), or the date warning naming the cut-off date and lines (`APRM_BankStatementLineWrongDateWarning`, `APRM_BankStatementLineWrongDateWarning2`).
@@ -96,7 +96,7 @@ flowchart TD
    - **Tables:** reads the user's preference (a saved system setting) in `AD_PREFERENCE`.
    - **User sees:** the prompt, warning that the run may create transactions, and a notice that every grid change is saved at once (`APRM_GRID_PERSIST_MESSAGE`) unless that preference hides it (Section 3.2); the screen has no Cancel or close button.
 6. **Prepare the draft reconciliation.**
-   - **What happens:** Whatever the answer, the account's draft (unfinished) reconciliation is reused or created (`APRM_MatchingUtility`). A reused draft is re-dated after repairing any transaction shown as cleared (agreed with the bank in a reconciliation, by a link or a tick) without a statement line, a trace of mixed manual and statement reconciliation (Section 4.4). A new draft is numbered, dated at the latest processed line and opened at the last reconciliation's balance.
+   - **What happens:** Whatever the answer, the account's draft (unfinished) reconciliation is reused or created (`APRM_MatchingUtility`). A reused draft is re-dated after repairing any transaction shown as cleared (agreed with the bank in a reconciliation, by a link or a tick) without a statement line, a trace of mixed manual and statement reconciliation (Section 4.4). A new draft is numbered, dated at the latest processed line and opened at the last reconciliation's balance (`MatchTransactionDao`).
    - **Done by:** `MatchStatementOnLoadActionHandler`, using `APRM_MatchingUtility`.
    - **Tables:** reads `FIN_BANKSTATEMENTLINE`, `C_DOCTYPE` and `FIN_RECONCILIATION`; writes the draft there, any repaired transaction in `FIN_FINACC_TRANSACTION` and its payment's status (stage, such as cleared) in `FIN_PAYMENT`.
    - **User sees:** nothing, unless `APRM_NoDocTypeRec` (no reconciliation numbering) or `APRM_ReconciliationMixed` (repair failed) stops it.
@@ -111,10 +111,10 @@ flowchart TD
    - **Tables:** reads `FIN_BANKSTATEMENT`, `FIN_BANKSTATEMENTLINE`, `FIN_FINACC_TRANSACTION`, `C_BPARTNER` and `C_GLITEM`; writes nothing.
    - **User sees:** each line's date, partner, reference (the bank's identifier, not an ERP document number), amount and how it was matched (Section 3.1), and the linked transaction's date, partner, amount and GL item. Search and add work only on unmatched rows, unmatch (undo a match) only on matched ones (`modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`).
 9. **Resolve the remaining lines.**
-   - **What happens:** For each unmatched line, the user searches for and links one or more transactions, splitting the line (dividing it into a matched part and an unmatched remainder) when amounts differ, or adds a missing one, created and linked at once; unmatch undoes a wrong link (`APRM_MatchingUtility`). Section 2 lists the actions, Section 4.2 their side effects and Section 4.4 the stale-line check (`CheckRecordChangedActionHandler`).
+   - **What happens:** For each unmatched line, the user searches for and links one or more transactions, splitting the line (dividing it into a matched part and an unmatched remainder) when amounts differ, or adds and links a missing one; unmatch undoes a wrong link (`APRM_MatchingUtility`). Sections 2 and 4.2 give the actions and side effects, Section 4.4 the stale-line check (refusal if someone else changed it, `CheckRecordChangedActionHandler`).
    - **Done by:** `FindTransactionsToMatchActionHandler`, `AddTransactionActionHandler` and `UnMatchSelectedTransactionsActionHandler`, all through `APRM_MatchingUtility`.
-   - **Tables:** reads and writes `FIN_BANKSTATEMENTLINE` (a split adds a line for the remainder), `FIN_FINACC_TRANSACTION` and `FIN_PAYMENT`.
-   - **User sees:** a pop-up grid of candidates or an entry form, then the refreshed grid, or `APRM_StaleDate` if the line changed.
+   - **Tables:** reads and writes `FIN_BANKSTATEMENTLINE` (splits add remainder lines), `FIN_FINACC_TRANSACTION` and `FIN_PAYMENT`.
+   - **User sees:** a pop-up grid of candidates or an entry form, then the refreshed grid, or `APRM_StaleDate`.
 
 **Figure 3. Completing and Posting the Reconciliation**
 
@@ -158,7 +158,7 @@ flowchart TD
 ### 1.3 Accounts and Periods Outside the Main Path
 
 - **Accounts reconciled without a bank file:** only bank-type accounts with a record in `FIN_MATCHING_ALGORITHM_ID` show `Import Statement` and `Match Statement`; cash accounts, and bank accounts without one, show `Reconcile` (`EM_APRM_RECONCILE`), opening the older `Reconciliation` screen, where the user ticks cleared transactions without statement lines. A workbench tracking unmatched lines would miss these accounts (Section 2.1, rows 36 to 42; mixing ban, Section 4.4).
-- **Reopening an earlier period:** once an earlier reconciliation is force-reopened (Section 2.1, row 48), `Match Transactions Force` replaces `Match Statement`, working only on lines up to its end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
+- **Reopening an earlier period:** once an earlier reconciliation is force-reactivated (reopened despite later reconciliations or matched lines; Section 2.1, row 48), `Match Transactions Force` replaces `Match Statement`, limited to lines up to its end date (`MatchStatementTransformer`); completing it recalculates later balances (step 11).
 
 **Requirement implications:** A workbench must start from each bank account's processed statement lines, act on the draft `Match Statement` uses, and expect completed reconciliations to leave lines unmatched; accounts without a bank file need separate treatment (Section 1.3).
 
@@ -479,7 +479,7 @@ Every setting read by matching and its screens (`StandardMatchingAlgorithm`, `Ma
 
 ## 4. Current Handling of Unmatched and Exception Items
 
-**What this section tells you:** This section traces each exception type from detection to resolution (Section 4.4, Appendix C). A person resolves each by hand; none records an owner, age or reason code (Section 4.3).
+**What this section tells you:** This section traces each exception type from detection to resolution (Section 4.4, Appendix C). Apart from later accepted automatic runs (Section 4.2), people resolve each; none records an owner, age or reason code (Section 4.3).
 
 ### 4.1 What Counts as Unmatched
 
@@ -487,9 +487,9 @@ An unmatched item is a processed statement's line with no linked transaction (`F
 
 ### 4.2 How Exceptions Are Resolved
 
-Apart from a later automatic run, each resolution starts from one row of the Match Statement grid (`Match Statement P&E`).
+Apart from a later automatic run, each resolution starts from one Match Statement grid row (`Match Statement P&E`).
 
-- Search and link, splitting when amounts differ: the line keeps the matched amount and a new unmatched remainder sharing its line number and date carries the rest (`APRM_MatchingUtility`); splitting is blocked once the reconciliation is posted (`APRM_SplitBSLReconciliationPosted`), a safeguard the screens never reach.
+- Search and link, splitting when amounts differ: the line keeps the matched amount and a new unmatched remainder sharing its line number and date carries the rest (`APRM_MatchingUtility`); splitting's block after posting (`APRM_SplitBSLReconciliationPosted`) is never reached (Section 4.4).
 - Add a transaction, linked with match level `AD` (manually added); without a typed description, a fee or GL item transaction reads only "Bank Fee" or "GL Item" and the item's name (`APRM_BankFee`, `APRM_GLItem`).
 - Unmatch, which merges (rejoins) the line with its still-unmatched split parts and, under the standard rules, deletes an algorithm-created transaction, and its payment if also algorithm-created, once reactivated, with accounting entries if posted (`APRM_MatchingUtility`, `StandardMatchingAlgorithm`). Because search and add work only on unmatched rows (Section 1.2), correcting a link always takes an unmatch first (`modules/org.openbravo.advpaymentmngt/web/org.openbravo.advpaymentmngt/js/ob-aprm-matchStatement.js`).
 - Carry forward: a reconciliation completes with unmatched lines left, and they reappear in the next reconciliation's pending list (`FIN_ReconciliationProcess`) unmarked as old. Reconcile gives no warning that lines remain (`MatchStatementActionHandler`), and each later automatic run retries them (`APRM_MatchingUtility`).
@@ -507,8 +507,8 @@ No type records an owner (Section 4.3): "Finance, assumed" names Section 2's ass
 
 | Exception type | Detected and seen | Resolved today | Owner today | Age and reason captured; gap |
 |----------------|-------------------|----------------|-------------|------------------------------|
-| Line left unmatched | No candidate, a declined run, or a rule error (Sections 3.1, 4.1) | Search and link, add, or carry forward (Section 4.2) | Finance, assumed | Age derivable, reason free text only (Section 4.3); not "matched without human touch" |
-| Wrong automatic match (`AP`, `AU`) | Only on review (Sections 3.3, 5) | Unmatch, then search or add; failures listed once by reference (`APRM_ErrorOnUnmatchingRecords`) | Finance, assumed; no reviewer recorded | Neither: unmatching empties `MATCHINGTYPE`, so causes cannot be counted or fed back into the rules |
+| Line left unmatched | No candidate, a declined run, or a rule error (Sections 3.1, 4.1) | Later accepted run, search and link, add, or carry forward (Section 4.2) | Finance, assumed | Age derivable, reason free text only (Section 4.3); not "matched without human touch" |
+| Wrong automatic match (`AP`, `AU`) | Only on review (Sections 3.3, 5) | Unmatch, then as an unmatched line; failures listed once by reference (`APRM_ErrorOnUnmatchingRecords`) | Finance, assumed; no reviewer recorded | Neither: unmatching empties `MATCHINGTYPE`, so causes cannot be counted or fed back into the rules |
 | Amount difference resolved by split | Only by a person's search, amounts being exact (Section 3.3, `FindTransactionsToMatchActionHandler`) | Split and merge (Section 4.2) | Finance, assumed; remainder unowned | Remainder keeps the original `DATETRX`; fee, partial payment or error is never said |
 | Missing transaction: fee, GL item or payment | Search finds none; the standard rules never create one (`StandardMatchingAlgorithm`) | Add Transaction, level `AD` (Section 4.2) | Finance, assumed | Age derivable (`DATETRX`); after resolution, type and GL item (`C_GLITEM`) say what, not why |
 | Carried-forward line | Reconcile completes with it unmatched (Section 4.2, `FIN_ReconciliationProcess`) | As a line left unmatched, later or never | Finance, assumed | Age derivable (`DATETRX`) but unmarked, no reason; with no due date (Section 4.3), nothing bounds cycle time |
@@ -528,7 +528,7 @@ flowchart TD
     accTitle: Figure 9. Lifecycle of an Unmatched Statement Line
     accDescr: A line moves from processing to reconciliation or carry-forward.
     A["Statement processed (FIN_BankStatementProcess)"] --> B{"Matching accepted and a candidate found? (StandardMatchingAlgorithm)"}
-    B -->|"Yes, strong or weak, and saved"| L["Line linked (FIN_FINACC_TRANSACTION)"]
+    B -->|"Yes, strong or weak, saved"| L["Line linked (FIN_FINACC_TRANSACTION)"]
     B -->|"No, declined, rules failed or save failed"| U["Line unmatched, no owner or reason (FIN_BANKSTATEMENTLINE)"]
     U --> G["Waits in one account's grid (MatchStatementTransformer)"]
     G -->|"Search finds one"| S["Search and link, split if amounts differ (FindTransactionsToMatchActionHandler)"]
@@ -544,9 +544,10 @@ flowchart TD
     R -->|"Linked lines"| C["Line reconciled"]
     R -->|"Unmatched lines"| F["Carried forward, unflagged"]
     F --> G
+    G -->|"Screen reopened"| B
 ```
 
-**How to read this:** Boxes are steps, diamonds decisions; each arrow back into "Line unmatched" is another manual pass.
+**How to read this:** Diamonds are decisions; the grid's arrow to the first diamond is a later automatic run, other loops manual work.
 
 **Requirement implications:** A workbench must give every exception type in Section 4.4 an assignee, a visible age and a coded reason across all accounts, and turn each blocked action into an owned item rather than a message shown once.
 
@@ -580,7 +581,7 @@ flowchart TD
    - **Evidence:** Section 3.3 gives the matching-start limit (`MatchStatementOnLoadActionHandler`, `APRM_AlgorithmConfirm`); neither import nor processing starts matching (Section 1.2, `ImportBankFile`, `FIN_BankStatementProcess`).
    - **Who is affected:** finance users working each bank account that uses matching, and people waiting for its reconciliation (`Match Statement`).
    - **Business impact:** waiting lengthens the cycle time the objective aims to cut, and an automatic step still needs a human touch to start (Section 6).
-   - **Why it ranks above the next item:** it outranks the unranked candidates because it applies to every processed statement on each bank account that uses matching (Section 1.1, `MatchStatementOnLoadActionHandler`). Date-order warnings and force processing arise only for statements dated on or before earlier lines (`APRM_BankStatementLineWrongDateWarning`), exclusion words are upkeep per file format (`FIN_BANKFILE_EXCEPTION`), and posting configuration shapes accounting entries, not matching (`DocFINReconciliation`).
+   - **Why it ranks above the next item:** it outranks the unranked candidates because it applies to every processed statement on each bank account that uses matching (Section 1.1, `MatchStatementOnLoadActionHandler`). Date-order warnings and force-processing arise only for statements dated on or before earlier lines (`APRM_BankStatementLineWrongDateWarning`), exclusion words are upkeep per file format (`FIN_BANKFILE_EXCEPTION`), and posting configuration shapes accounting entries, not matching (`DocFINReconciliation`).
 
 **Requirement implications:** Requirements must cover both preventing manual work and accountable resolution of the exceptions that remain, and this ranking should be checked against workload and outcome data before it sets delivery order (Section 7).
 
@@ -623,7 +624,7 @@ Support levels: Full, delivered and recorded; Partial, part only; None, absent.
 
 ## Appendix A. Glossary
 
-Each technical term as defined at its first use.
+Each technical term as first defined.
 
 | Term | Plain definition |
 |------|------------------|
@@ -650,6 +651,8 @@ Each technical term as defined at its first use.
 | Exceptions | items needing a person: unmatched lines, wrong matches and blocked actions |
 | Financial account | the ERP record for one bank account |
 | Fixed gates | conditions no setting changes |
+| Force-processing | processing despite the date check |
+| Force-reactivate | reopen despite later reconciliations or matched lines |
 | Frequency driver | the event that brings an action back |
 | General ledger | the company's books |
 | GL item | a general-ledger category for amounts with no invoice, such as bank fees |
@@ -680,6 +683,7 @@ Each technical term as defined at its first use.
 | Role | a named set of screen and process permissions |
 | Server log | a technical record users do not see |
 | Split (a line) | dividing it into a matched part and an unmatched remainder |
+| Stale-line check | refusal if someone else changed the line |
 | Status | stage, such as cleared |
 | Strong match | a candidate found by the algorithm's primary rules |
 | Swimlanes | diagrams with one lane per actor |
@@ -697,7 +701,7 @@ Supports Section 2.1: why these flow buttons and checks have no row.
 
 - `Funds Transfer` (`EM_APRM_FUNDS_TRANS`) moves money between accounts, creating candidates, not resolving lines; `Transaction` tab posting lies outside this flow.
 - Hidden columns `EM_APRM_ADDTRANSACTIONPD` and `EM_APRM_FINDTRANSACTIONSPD` only hold the search and add actions' process definitions (Section 2.1, rows 25 and 27 to 30); `EM_APRM_PROCESS_RECONCILIATION` is never shown.
-- The stale-line check (`CheckRecordChangedActionHandler`) has no row: it only refuses an action on a line someone else changed (Section 4.4).
+- The stale-line check (`CheckRecordChangedActionHandler`) only refuses actions (Section 4.4).
 
 ## Appendix C. Further Checks That Interrupt Exception Work
 
