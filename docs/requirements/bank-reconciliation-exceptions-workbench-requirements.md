@@ -2,32 +2,32 @@
 
 ## Key Takeaways
 
-- Every bank statement line left unlinked gets an owner (the person accountable), a status (its stage), a reason code (why it is open) and an age in days.
-- Three phases: data foundation; a cross-account list, to-do alerts and dashboard counts; then matching on a timetable with no person acting.
-- Cash accounts and bank accounts without saved matching rules keep today's screens; six deferred items get only a hook.
-- The conflicts register settles the main mismatches: alerts count per company or branch, a reopened earlier period limits matching, and fields reach every line.
-- Still `TBD`, numbers to be set by measurement: the share of lines counting as "most", the cycle-time target and load times; age bands await a decision.
+- Every unlinked statement line (one entry on the statement the bank sends) gets an owner (the person accountable for resolving a line), a status, a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line).
+- Three phases: data foundation; a cross-account list, to-do messages and dashboard counts; then automatic linking on a timetable.
+- Cash accounts and bank accounts lacking linking rules keep today's screens; six deferred items get only a hook.
+- Main conflicts settled: to-do messages count per company or branch, a reopened earlier period limits linking, fields reach every line.
+- Still `TBD`, numbers to be set by measurement: the share of lines counting as "most", the import-to-completion time target and load times; age bands, the ranges of ages used to group lines, await a decision.
 
 ## 1. Summary
 
 ### 1.1 What the workbench does
 
-The request's objective is: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." A reconciliation is the period document confirming the system's balance agrees with the bank; cycle time is the time from statement import to completed reconciliation, and manual effort is the staff work reconciliation takes.
+A transaction is the system's record of money expected in or out of a financial account, the system's record for one bank account or one cash account. Today, matching, linking a statement line to the transaction it settles, waits until someone opens Match Statement, the screen opened from a bank account to match its lines (Analysis 1, Section 3.3); a matching algorithm is the saved set of matching rules a bank account uses.
 
-Today, matching, linking a statement line (one entry on the statement the bank sends) to the transaction it settles, waits until someone opens Match Statement, the screen opened from a bank account to match its lines (Analysis 1, Section 3.3). A transaction is the system's record of money expected in or out of a financial account, the system's record for one bank account or one cash account; a matching algorithm is the saved set of matching rules a bank account uses.
+A reconciliation is the period document confirming the system's balance agrees with the bank; cycle time is the time from statement import to completed reconciliation, and manual effort is the staff work reconciliation takes. The objective is: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code."
 
-The workbench is the whole set of capabilities this document specifies. Each unmatched line, a line on a processed statement (one the system has confirmed) not yet linked to a transaction, becomes an exception, an unmatched line under the workbench's tracking. Each exception gets an owner (the person accountable for resolving a line), an exception status (a line's stage in the workbench), a reason code (a coded record of why a line is unresolved) and an age (whole calendar days since the bank's date for the line), none recorded today (Analysis 1, Section 4.3).
+The workbench is the whole set of capabilities this document specifies. Each unmatched line, a line on a processed statement (one the system has confirmed) not yet linked to a transaction, becomes an exception, an unmatched line under the workbench's tracking. Each exception gets an owner, an exception status (a line's stage in the workbench), a reason code and an age, none recorded today (Analysis 1, Section 4.3).
 
-The request's five capabilities are exception fields; the worklist, the single list of exceptions across all in-scope bank accounts (those with a matching algorithm); alerts, each a system-generated on-screen to-do message sent to a user or role (a named set of screen and process permissions); the counts widget, a dashboard tile showing counts from a saved query; and scheduled matching by a scheduled job, work the system runs on a timetable without a user. Section 1.2 breaks them into nine, F1 to F9, by phase.
+The five requested capabilities are exception fields; the worklist, the single list of exceptions across all in-scope bank accounts (those with a matching algorithm, the only kind importing statements and using Match Statement); alerts, each a system-generated on-screen to-do message sent to a user or role (a named set of screen and process permissions); the counts widget, a dashboard tile showing counts from a saved query, the product's Query/List widget; and scheduled matching by a scheduled job, work the system runs on a timetable without a user.
 
 ### 1.2 Delivery phases
 
-The phases follow Analysis 2, Section 6: data before what reads it, visible before unattended, and tests before changes. Each phase ends with its test gate, the tests that must pass before a phase is accepted (Sections 4.2.12, 4.3.12 and 4.4.4). The order rests on the effort ranking of Analysis 1, Section 5 (A-2).
+The phases follow Analysis 2, Section 6: data before what reads it, visible before unattended, tests before changes. Each phase ends with its test gate, the tests that must pass before a phase is accepted (Sections 4.2.12, 4.3.12 and 4.4.4). The order rests on the effort ranking of Analysis 1, Section 5 (A-2).
 
 | Phase | Capabilities | What users get |
 |---|---|---|
-| Phase 1: Data foundation | F1 Exception fields, F3 Weak-match flag, F4 Measurement stamps | Each line can carry a status, owner, reason code and due date (an optional target date for resolving it), kept right on every match and unmatch (undoing a link). A weak match, a link the rules made using only their looser fallback checks, carries an unconfirmed weak match flag, meaning no confirmation has been recorded for it. Measurement stamps are each match's recorded time and source and each reconciliation's completion time. A backfill, filling a new field for rows that already exist, sets existing unmatched lines to Open. |
-| Phase 2: Visibility and follow-up | F2 Age, F5 Worklist, F6 Alerts, F7 Counts widget, F8 Reconcile warning | Ages in age bands, the ranges of ages used to group lines, and the worklist, with filters and single-line actions. Daily alerts reach owners and the Finance role, the standard role for finance staff. The counts widget shows the backlog, and a warning flags lines left at completion. |
+| Phase 1: Data foundation | F1 Exception fields, F3 Weak-match flag, F4 Measurement stamps | Each line can carry a status, owner, reason code and due date (an optional target date for resolving it), kept right on every match and unmatch (undoing a link). A weak match, a link the rules made using only their looser fallback checks, labelled "Approved", carries an unconfirmed weak match flag, meaning no confirmation has been recorded for it; only an unmatch clears it in this release. Measurement stamps are each match's recorded time and source and each reconciliation's completion time. A backfill, filling a new field for rows that already exist, sets existing unmatched lines to Open. |
+| Phase 2: Visibility and follow-up | F2 Age, F5 Worklist, F6 Alerts, F7 Counts widget, F8 Reconcile warning | Ages in age bands and the worklist, with filters and single-line actions. Daily alerts reach owners and the Finance role, the standard role for finance staff. The counts widget shows the backlog, and a warning flags lines left at completion. |
 | Phase 3: Automated matching | F9 Scheduled matching | Today's rules run after each import and nightly, so the worklist holds only what they could not match. |
 
 ### 1.3 What is excluded and deferred
@@ -41,11 +41,9 @@ Excluded accounts are cash accounts and bank accounts with no matching algorithm
 | Aging and unassigned alerts | Raised daily | None |
 | Reconcile warning | Shown when lines remain | None |
 | Scheduled matching | After each import and nightly | Skipped and logged |
-| Exception fields | Set by worklist actions, match and unmatch | Creation default and release backfill only; shown nowhere |
+| Exception fields | Set by worklist actions, match and unmatch | Open by the table-wide creation default and release backfill only (REQ-01, REQ-08, C-18); shown nowhere, and no workbench requirement (REQ-12 to REQ-25) targets them |
 
-The table-wide data foundation sets these accounts' new and existing unmatched processed lines to Open (REQ-01, REQ-08, C-18), but no workbench requirement (REQ-12 to REQ-25) targets them.
-
-Analysis 2, Section 5.2 ranks six full-scope capabilities this release defers, each with a hook and no requirement.
+Analysis 2, Section 5.2 ranks six full-scope capabilities this release defers.
 
 | Deferred item | Hook it relies on | Requirement in this release |
 |---|---|---|
@@ -60,56 +58,63 @@ Analysis 2, Section 5.2 ranks six full-scope capabilities this release defers, e
 
 ### 2.1 Traceability table
 
-Each row links a finding of the analyses to its capability, requirements, phase and objective element, one of the six that Analysis 1, Section 6 lists (C-02), such as the auto-match rate, the share of statement lines matched with no person acting.
+Each row's objective element is one of the six Analysis 1, Section 6 lists (C-02), such as the auto-match rate, the share of statement lines matched with no person acting.
 
 | Analysis finding | Capability (F#) | REQ IDs | Objective element | Phase |
 |---|---|---|---|---|
 | Lines have no owner, reason, status or due date (Analysis 1, Section 4.3; Analysis 2, Section 3) | F1 | REQ-01 to REQ-08 | Owner, reason code | 1 |
-| Free text cannot be counted by cause (Analysis 1, Sections 4.3 and 6) | F1 | REQ-03 | Reason code | 1 |
-| The processing lock, the database rule that stops changes to the bank's own details on a confirmed statement, leaves new fields editable (Analysis 2, Sections 3 and 5.1, rank 2) | F1 | REQ-07, NFR-04 | Owner, reason code | 1 |
-| Weak matches are applied unconfirmed, and wrong links surface only on review (Analysis 1, Sections 3.3 and 5, item 3; Analysis 2, Section 5.2, rank 4) | F3 | REQ-09 | Auto-match rate, manual effort | 1 |
-| Run counts are not stored, unmatching clears the match level (the code recording how a line was matched), and no match or completion time is kept (Analysis 1, Sections 6 and 7; Analysis 2, Section 5.2, rank 6) | F4 | REQ-10, REQ-11 | Auto-match rate, cycle time | 1 |
-| Age can be derived but is never shown (Analysis 1, Sections 4.3 and 6) | F2 | REQ-12 | Age | 2 |
-| No view spans accounts, and line-by-line resolution is the largest effort (Analysis 1, Sections 4.1 and 5, item 1; Analysis 2, Section 5.1, ranks 1 and 2) | F5 | REQ-13 to REQ-18 | Owner, age, reason code, manual effort | 2 |
-| Nothing watches lines, and carried-forward lines, unmatched lines left open when a reconciliation completes, are not marked as old (Analysis 1, Sections 4.2 and 4.3; Analysis 2, Section 5.1, rank 4) | F6 | REQ-19, REQ-20 | Owner, age | 2 |
+| Free text cannot be counted by cause (Analysis 1, Section 4.3; Analysis 1, Section 6) | F1 | REQ-03 | Reason code | 1 |
+| The processing lock, the database rule that stops changes to the bank's own details on a confirmed statement, leaves new fields editable (Analysis 2, Section 3; Analysis 2, Section 5.1, rank 2) | F1 | REQ-07, NFR-04 | Owner, reason code | 1 |
+| Weak matches apply unconfirmed; wrong links surface only on review (Analysis 1, Section 3.3; Analysis 1, Section 5, item 3; Analysis 2, Section 5.2, rank 4) | F3 | REQ-09 | Auto-match rate, manual effort | 1 |
+| Run counts go unstored, unmatching clears the match level (the code recording how a line was matched), and no match or completion time is kept (Analysis 1, Section 6; Analysis 1, Section 7; Analysis 2, Section 5.2, rank 6) | F4 | REQ-10, REQ-11 | Auto-match rate, cycle time | 1 |
+| Age is derivable but never shown (Analysis 1, Section 4.3; Analysis 1, Section 6) | F2 | REQ-12 | Age | 2 |
+| No view spans accounts; line-by-line resolution is the largest effort (Analysis 1, Section 4.1; Analysis 1, Section 5, item 1; Analysis 2, Section 5.1, ranks 1 and 2) | F5 | REQ-13 to REQ-18 | Owner, age, reason code, manual effort | 2 |
+| Nothing watches lines; carried-forward lines, unmatched lines left open when a reconciliation completes so they reappear next period, are not marked old (Analysis 1, Section 4.2; Analysis 1, Section 4.3; Analysis 2, Section 5.1, rank 4) | F6 | REQ-19, REQ-20 | Owner, age | 2 |
 | No one sees the whole backlog (Analysis 1, Section 4.1; Analysis 2, Section 5.1, rank 5) | F7 | REQ-21 | Owner, age, reason code | 2 |
 | Reconcile gives no warning that lines remain (Analysis 1, Section 4.2) | F8 | REQ-22 | Cycle time, owner | 2 |
-| Nothing is matched between import and a user session, and nothing signals a waiting statement (Analysis 1, Sections 3.3 and 5, item 5; Analysis 2, Section 5.1, rank 3) | F9 | REQ-23 to REQ-25 | Auto-match rate, cycle time, manual effort | 3 |
-| Worklist speed cannot be determined from code (Analysis 2, Sections 1.4 and 7) | F5, F7 | NFR-01 | Manual effort | 2 |
+| Nothing is matched between import and a user session or signals a waiting statement (Analysis 1, Section 3.3; Analysis 1, Section 5, item 5; Analysis 2, Section 5.1, rank 3) | F9 | REQ-23 to REQ-25 | Auto-match rate, cycle time, manual effort | 3 |
+| Code cannot show worklist speed (Analysis 2, Section 1.4; Analysis 2, Section 7) | F5, F7 | NFR-01 | Manual effort | 2 |
 | Organization grants limit each role to its organizations, the companies or branches whose records a role may see (Analysis 2, Section 2.2) | F5 to F7 | NFR-02 | Owner | 2 |
-| Posting, creating the accounting entries in the general ledger (the company's books), is High severity and only partly tested (`RecordID2Test` reposts existing reconciliations); statement processing is High severity and untested; the processing lock covers only the bank's fields (Analysis 2, Sections 3 and 4.2) | F1, F4, F9 | NFR-03, NFR-04 | Safeguard, no element | 1 to 3 |
+| Posting, creating the accounting entries in the general ledger (the company's books), is High severity and only partly tested (the posting test, `RecordID2Test`, reposts existing reconciliations); statement processing, High severity, is untested; the processing lock covers only the bank's fields (Analysis 2, Section 3; Analysis 2, Section 4.2) | F1, F4, F9 | NFR-03, NFR-04 | Safeguard, no element | 1 to 3 |
 
 ### 2.2 Two-way check
 
-Forward, each of F1 to F9 has at least one requirement; backward, every REQ and NFR names its capability, cites both analyses and appears in Sections 2.1 and 9. Reading each cited section against its requirement found these gaps:
+Both directions pass:
+
+| Direction | Check |
+|---|---|
+| Forward | F1 to F9 each have at least one requirement. |
+| Backward | Every REQ and NFR names its capability, cites both analyses and appears in Sections 2.1 and 9. |
+
+Reading each cited section against its requirement found:
 
 | Item | What the check found |
 |---|---|
-| REQ-22 | Not a miss: Analysis 2 has no finding on a reconcile warning, so its only Analysis 2 source is a risk row. |
-| NFR-01, NFR-02 | Partial: Analysis 1 supports only that volumes are unknown (Analysis 1, Section 7) and that roles grant access (Analysis 1, Section 2.1); speed and organization scoping rest on Analysis 2. |
+| REQ-22 | Not a miss: Analysis 2 has no reconcile-warning finding, so its only Analysis 2 source is a risk row. |
+| NFR-01, NFR-02 | Partial: Analysis 1 supports only that volumes are unknown (Analysis 1, Section 7) and roles grant access (Analysis 1, Section 2.1); speed and organization scoping rest on Analysis 2. |
 
 ## 3. Conflicts
 
 ### 3.1 Conflicts register
 
-Code evidence is a file and line numbers at `master` commit `77692f968d`; full paths close Section 3.2.
+Code evidence is file and line at `master` commit `77692f968d`; full paths close Section 3.2.
 
 | ID | What the request or a source says against what the code or a source shows | Requirements affected | Resolution |
 |---|---|---|---|
-| C-01 | The stated paths `docs/analysis/analysis-1-current-state-reconciliation.md`, `docs/analysis/analysis-2-extension-points-and-risks.md` and `blitzy/documentation/Project Guide - e5d40ea1-c3ed-4994-87eb-e962dec9dc66.md` are absent from `master` and sit on branch `blitzy-e5d40ea1-c3ed-4994-87eb-e962dec9dc66`, read at `68ab20e6bd`; later commits `e26102ab7b` to head `af6933f42b` reword both analyses but keep every heading. | All citations | Cite by stated path and section number, valid at both commits. |
-| C-02 | The request names four Analysis 1, Section 6 elements and adds cycle time and manual effort, which that section already lists. | Section 6 | Use its six once each. |
-| C-03 | The Project Guide describes earlier analyses: 8 steps, 17 manual actions and 13 integration areas (Project Guide, Sections 1.1 and 1.3), not today's 12, 55 and 17. U1 to U7 and A-1 to A-3 appear only in Project Guide, Sections 1.4 and 2.1, which agree. | Section 7 | Findings from the analyses, identifiers from the Project Guide; none is missing. |
-| C-04 | The request wants owner aging alerts from new alert rules (saved queries that raise alerts) and one recommended design. Alerts show only to recipient users or roles (`ADAlertDatasourceService.java:99-109`), a filter clause can narrow them to the owner (`ADAlertDatasourceService.java:152-173`), and email reaches every user of each recipient role (`AlertProcess.java:343-452`). An alert repeats only once the earlier one is solved, keyed by a 32-character reference (`AlertProcess.java:109-111`; `AD_ALERT.xml:68`). | REQ-19, NFR-02 | One rule with an owner filter, recipients every role granted the worklist, on screen, no email; one rule per owner is rejected, as each new owner would need one, conflicting with claiming. It raises one alert per owner per organization per day, because Alert Management, the screen listing a user's alerts, hides whole alerts by organization, never a count inside one (`ADAlertDatasourceService.java:165-183`). This departs from "one alert per owner per day" only for owners in several organizations. The key changes daily, so the previous day's alert closes itself (`AlertProcess.java:475-484`). |
+| C-01 | The stated paths `docs/analysis/analysis-1-current-state-reconciliation.md`, `docs/analysis/analysis-2-extension-points-and-risks.md` and `blitzy/documentation/Project Guide - e5d40ea1-c3ed-4994-87eb-e962dec9dc66.md` are absent from `master` and sit on branch `blitzy-e5d40ea1-c3ed-4994-87eb-e962dec9dc66`, read at `68ab20e6bd`; later commits `e26102ab7b` to head `af6933f42b` reword both analyses but keep every heading. | All citations | Cite by stated path and section number. |
+| C-02 | The request names four Analysis 1, Section 6 elements and adds cycle time and manual effort, already listed there. | Section 6 | Use its six once each. |
+| C-03 | The Project Guide describes earlier analyses: 8 steps, 17 manual actions and 13 integration areas (Project Guide, Section 1.1; Project Guide, Section 1.3), not today's 12, 55 and 17. U1 to U7 and A-1 to A-3 appear only in Project Guide, Section 1.4 and Project Guide, Section 2.1, which agree. | Section 7 | Findings from the analyses, identifiers from the Project Guide; none is missing. |
+| C-04 | The request wants owner aging alerts from new alert rules (saved queries that raise alerts), recommending one design. Alerts show only to recipient users or roles (`ADAlertDatasourceService.java:99-109`), a filter clause can narrow them to the owner (`ADAlertDatasourceService.java:152-173`), and email reaches every user of each recipient role (`AlertProcess.java:343-452`). An alert repeats only once the earlier one is solved, keyed by a 32-character reference (`AlertProcess.java:109-111`; `AD_ALERT.xml:68`). | REQ-19, NFR-02 | One on-screen rule with an owner filter, recipients every worklist-granted role, no email; one rule per owner is rejected, as each new owner would need one, conflicting with claiming, taking an unassigned line for oneself. It raises one alert per owner per organization per day, because Alert Management, the screen listing a user's alerts, hides whole alerts by organization, never a count inside one (`ADAlertDatasourceService.java:165-183`), departing from "one alert per owner per day" only for owners in several organizations. The key changes daily, closing the previous day's alert (`AlertProcess.java:475-484`). |
 | C-05 | Analysis 2, Section 5.1, rank 4 gives Finance one alert per unowned line; the request asks for a daily digest, one alert carrying a count instead of one alert per line. | REQ-20 | One digest per organization, so users see only counts they may read (`ADAlertDatasourceService.java:169-170`). |
-| C-06 | Analysis 2, Section 6 puts the confirmation flag in its Phase 5 and measurement in its Phase 4; the request puts F3 and F4 in Phase 1. | REQ-09 to REQ-11 | Follow the request; the flag gains a reader in Phase 2 (REQ-13), and only the stamps wait for the deferred reporting. |
-| C-07 | The request cites Analysis 2, Sections 4 and 6 for every gate; Analysis 2, Section 6 names gates only for its Phases 1, 3, 5 and 6. | Section 4.3.12 | Draw the Phase 2 gate from the Analysis 2, Section 4.2 mitigations. |
-| C-08 | No test clicks through a screen (Analysis 2, Section 4), and the browser test runner covers three utility files (Analysis 2, Section 1.1), so the warning's display has no automated test. | REQ-22 | JUnit, the Java test framework, for the server response; a recorded manual test for the display. |
-| C-09 | Analysis 2, Section 4.2 has no widget row, no test refers to `QueryListDataSource`, and the widget query runs with elevated rights (`QueryListDataSource.java:164`), so the organization limit must sit in the query, as in shipped widgets (`OBUIAPP_PARAMETER.xml:188-190`). | REQ-21, NFR-02 | Add a datasource test on the existing harness (`BaseDataSourceTestDal.java:43`). |
-| C-10 | The request says reactivating an "earlier" reconciliation is refused while a draft reconciliation, an unfinished one, exists; the code refuses any of the account's reconciliations, latest included, forced or not (`FIN_ReconciliationProcess.java:121-139`). | REQ-25 | The job reuses the draft and creates one only when it links a line; users finish or delete a draft first, as today (Analysis 1, Section 2.1, rows 44 and 51). |
-| C-11 | The request opens a line "in Match Statement", which opens only from a financial account record (`MatchStatementOnLoadActionHandler.java:59`; `AD_FIELD.xml:13477`). With an earlier reconciliation as the open draft, the account shows Match Transactions Force, the variant limited to that period (`AD_FIELD.xml:16298-16304`), listing only lines up to its end date (`MatchStatementTransformer.java:74-78`). | REQ-17 | The worklist opens the line's financial account (`ResponseActionsBuilder.java:136-185`), one click from Match Statement. A line dated after an earlier open draft's end date stays absent until that draft is completed or deleted (C-10), so not every row resolves at once. A direct launch would need new screen code, which Analysis 2, Section 1.2 advises against. |
-| C-12 | F1 adds a due date that F5 never shows, and alerts use age. | REQ-04, REQ-13, REQ-15 | Show and edit it on the worklist; no alert uses it. |
-| C-13 | Users set status, yet Resolved is automatic on a match. | REQ-05, REQ-15 | Per the edit policy (Section 4.1.2), users choose Open, Assigned or In Review, and only a match sets Resolved. |
-| C-14 | F3 calls weak matches unconfirmed; the match-level list labels them "Approved" (`AD_REF_LIST.xml:9273-9274`). | REQ-09 | No relabel; the flag reads "Unconfirmed weak match", and the glossary explains the label. |
+| C-06 | Analysis 2, Section 6 puts the confirmation flag in its Phase 5 and measurement in its Phase 4; the request puts F3 and F4 in Phase 1. | REQ-09 to REQ-11 | Follow the request; the flag gains a reader in Phase 2 (REQ-13); only the stamps wait for the deferred reporting. |
+| C-07 | The request cites Analysis 2, Section 4 and Analysis 2, Section 6 for every gate; the latter names gates only for its Phases 1, 3, 5 and 6. | Section 4.3.12 | Draw the Phase 2 gate from the Analysis 2, Section 4.2 mitigations. |
+| C-08 | No test clicks through a screen (Analysis 2, Section 4); the browser test runner covers three utility files (Analysis 2, Section 1.1), so the warning's display has no automated test. | REQ-22 | JUnit, the Java test framework, for the server response; a recorded manual test for the display. |
+| C-09 | Analysis 2, Section 4.2 has no widget row, no test refers to the widget's data service (`QueryListDataSource`), which runs its query with elevated rights (`QueryListDataSource.java:164`), so the organization limit must sit in the query, as in shipped widgets (`OBUIAPP_PARAMETER.xml:188-190`). | REQ-21, NFR-02 | Add a data-service (datasource) test on the shared test setup (harness, `BaseDataSourceTestDal.java:43`). |
+| C-10 | The request says reactivating an "earlier" reconciliation is refused while a draft reconciliation (an unfinished reconciliation, at most one per account, that blocks reopening the account's other reconciliations) exists; the code refuses reactivating any, latest included, forced or not (`FIN_ReconciliationProcess.java:121-139`). | REQ-25 | The job reuses the draft, creating one only when it links a line; users finish or delete a draft first, as today (Analysis 1, Section 2.1, rows 44 and 51). |
+| C-11 | The request opens a line "in Match Statement", which opens only from a financial account record (`MatchStatementOnLoadActionHandler.java:59`; `AD_FIELD.xml:13477`). With an earlier reconciliation as the open draft, the account shows Match Transactions Force, the variant limited to that period (`AD_FIELD.xml:16298-16304`), listing only lines up to its end date (`MatchStatementTransformer.java:74-78`). | REQ-17 | The worklist opens the line's financial account (`ResponseActionsBuilder.java:136-185`), one click from Match Statement. Lines dated after an earlier open draft's end date stay absent until it is completed or deleted (C-10), so not every row resolves at once. A direct launch needs new screen code, which Analysis 2, Section 1.2 advises against. |
+| C-12 | F1 adds a due date F5 never shows, and alerts use age. | REQ-04, REQ-13, REQ-15 | Show and edit it on the worklist; no alert uses it. |
+| C-13 | Users set status, yet Resolved is automatic on a match. | REQ-05, REQ-15 | Per the edit policy (Section 4.1.2), users choose Open, Assigned or In Review; only a match sets Resolved. |
+| C-14 | F3 calls weak matches unconfirmed; the match-level list labels them "Approved" (`AD_REF_LIST.xml:9273-9274`). | REQ-09 | No relabel; the flag reads "Unconfirmed weak match"; the glossary explains the label. |
 | C-15 | Analysis 2, Section 3 would confirm existing weak matches by backfill; the request backfills status only. | REQ-08, REQ-09 | No flag backfill; the deferred review queue decides older weak matches. |
 | C-16 | Excluded accounts can hold hand-entered processed statements (Analysis 1, Section 2.1, row 13). | REQ-13, REQ-21 | The worklist and counts widget cover only in-scope accounts. |
 | C-17 | F5 lists unmatched lines yet shows the weak-match flag, which only matched lines carry. | REQ-09, REQ-13, REQ-15 | The worklist also lists weak-flagged lines of a draft reconciliation, Resolved and read-only, until completion, as the Match Statement grid lists draft-matched lines (`MatchStatementTransformer.java:66-67`). Alerts and the counts widget count unmatched lines only. |
@@ -117,28 +122,26 @@ Code evidence is a file and line numbers at `master` commit `77692f968d`; full p
 
 ### 3.2 Confirmed as described
 
-Every other name the request uses exists as described.
-
 | Name in the request | What it is | Confirmed in |
 |---|---|---|
-| `FIN_BANKSTATEMENTLINE` | Statement-line table, with no owner, status, reason, due date or flag column, even from modules | `FIN_BANKSTATEMENTLINE.xml:2-112` |
+| `FIN_BANKSTATEMENTLINE` | Statement-line table lacking owner, status, reason, due date and flag columns, even from modules | `FIN_BANKSTATEMENTLINE.xml:2-112` |
 | `DATETRX` | Bank's date for the line, required and copied to a remainder | `FIN_BANKSTATEMENTLINE.xml:52`; `APRM_MatchingUtility.java:806` |
 | `MATCHINGTYPE` | Match level: AU Auto, AP Approved, MA Manual, AD Added, NO None (C-14) | `FIN_BANKSTATEMENTLINE.xml:68`; `AD_REF_LIST.xml:9273, 10822, 11763, 12112, 13881` |
 | `DESCRIPTION` | Free text up to 2,000 characters | `FIN_BANKSTATEMENTLINE.xml:76` |
 | `AD_USER` | System users | `AD_USER.xml:3` |
-| `AD_ALERTRULE` and recipient records | Rules with filter clause and query; recipient records with a required role, optional user and send-email flag (C-04) | `tables/AD_ALERTRULE.xml:40-48`; `AD_ALERTRECIPIENT.xml:4, 44, 48`; `AD_ALERT.xml:44-68` |
+| `AD_ALERTRULE` and recipient records | Rules with filter clause and query; recipients with required role, optional user and send-email flag (C-04) | `tables/AD_ALERTRULE.xml:40-48`; `AD_ALERTRECIPIENT.xml:4, 44, 48`; `AD_ALERT.xml:44-68` |
 | `OBCQL_WIDGET_QUERY` | Query/List widget query, granted by role (C-09) | `OBCQL_WIDGET_QUERY.xml:36-47`; `OBKMO_WIDGET_CLASS_ACCESS.xml:3` |
-| `MatchStatementOnLoadActionHandler` | Opens Match Statement on one account's draft, matching only on acceptance and showing, not storing, the count | `MatchStatementOnLoadActionHandler.java:59-98, 117-172` |
+| `MatchStatementOnLoadActionHandler` | Opens Match Statement on one account's draft, matching only on acceptance and showing but not storing the count | `MatchStatementOnLoadActionHandler.java:59-98, 117-172` |
 | `APRM_MatchingUtility` | Writes each match and unmatch in one place, unmatch clearing the match level; copies a line before dividing it, deletes parts when rejoining, and reads the browser for messages | `APRM_MatchingUtility.java:283-329, 377-436, 445-496, 801-806, 868-870` |
 | `AlertProcess` | Runs alert rules as process 800170, daily at 23:59 (C-04, C-05) | `AlertProcess.java:106-162`; `AD_PROCESS_REQUEST.xml:47, 54, 56`; `Frequency.java:27` |
 | `OBScheduler` | Starts jobs now or on saved schedules | `OBScheduler.java:124, 159` |
-| `Reconciliation` servlet | The older manual Reconciliation screen, completing on its own | `Reconciliation.java:74, 357` |
-| `aprm_matchstatement` | HQL-based table behind the Match Statement grid, HQL being the query language that selects the records a list shows | `sourcedata/AD_TABLE.xml:218, 230` |
+| `Reconciliation` servlet | Older manual Reconciliation screen, a classic server page (servlet) completing on its own | `Reconciliation.java:74, 357` |
+| `aprm_matchstatement` | Table behind the Match Statement grid, built on the query language that selects the records a list shows (HQL) | `sourcedata/AD_TABLE.xml:218, 230` |
 | Match Statement | A Pick and Execute screen, a pop-up grid where a user selects rows and runs an action on them (C-11); its Reconcile All, the action that completes a reconciliation, returns a plain success message | `OBUIAPP_PROCESS.xml:84, 91`; `AD_WINDOW.xml:205, 208`; `MatchStatementActionHandler.java:59-66` |
-| Finance role | Standard "Finance" role of the V3 Roles dataset: Financial Account (editable), Import Statement, Reconcile and both reconciliation reports; no alert-recipient or widget grant | `V3_Roles.xml:1898-1906`; `AD_DATASET.xml:8-13` |
+| Finance role | Standard "Finance" role in a saved set of standard records, the V3 Roles dataset: Financial Account (editable), Import Statement, Reconcile and both reconciliation reports; no alert-recipient or widget grant | `V3_Roles.xml:1898-1906`; `AD_DATASET.xml:8-13` |
 | `APRM_DraftReconciliationExists` | Refuses reactivation while a draft exists (C-10) | `AD_MESSAGE.xml:849-850`; `FIN_ReconciliationProcess.java:132-139` |
 | "Old not processed Bank Statements" | Inactive rule `1000010` on the older `c_bankstatement` table, flagging statements unprocessed over 10 days | `referencedData/AD_ALERTRULE.xml:150` |
-| Processing-lock trigger `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Locks only the bank's own fields on processed or matched lines | `APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:46-56, 63, 67, 72-83` |
+| Processing-lock trigger `APRM_FIN_BNKSTM_LINE_CHECK_TRG` | Database rule (trigger) locking only the bank's own fields on processed or matched lines | `APRM_FIN_BNKSTM_LINE_CHECK_TRG.xml:46-56, 63, 67, 72-83` |
 | Pick and Execute | Pattern of Find Transactions to Match and Match Statement | `OBUIAPP_PROCESS.xml:14, 91` |
 | Draft reconciliation | Status `DR`, checked before reactivation (C-10); completion stores no time | `APRM_MatchingUtility.java:681`; `FIN_ReconciliationProcess.java:99-106, 189-202`; `FIN_RECONCILIATION.xml:48-64` |
 
@@ -226,38 +229,38 @@ Audit state (U6): auditing per table, a separate setting for new records, exclud
 
 #### 4.1.1 Entry format
 
-Each requirement keeps a fixed ID; a dropped one is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement: one starting state, one action and one observable result. The regression risk, a chance that something working today breaks, names its Analysis 2, Section 4.2 integration areas and their severity.
+Each requirement keeps a fixed ID; a dropped one is marked "Withdrawn", so ticket links stay valid. Each acceptance criterion is a Given/When/Then statement, a three-part test statement. The regression risk, a chance that something working today breaks, names its Analysis 2, Section 4.2 integration areas and their severity.
 
 #### 4.1.2 Edit policy
 
-This is the one statement of who may change the new fields; REQ-07, REQ-15, REQ-16, C-13 and C-17 follow it. A split divides a line into a matched part and an unmatched remainder, and a merge rejoins the unmatched parts.
+This sole statement of who may change the new fields governs REQ-07, REQ-15, REQ-16, C-13 and C-17. A split divides a line into a matched part and an unmatched remainder, and a merge rejoins the unmatched parts.
 
 | Record | Users may change | Through | The system changes |
 |---|---|---|---|
-| Unmatched line of an in-scope account (bank account with a matching algorithm) | Owner (Finance assigns, giving a line to someone; any worklist user claims, taking an unassigned line for oneself), reason code, due date, and status among Open, Assigned and In Review | Worklist actions only, one line per action; bulk actions are deferred | Status to Assigned on assign or claim of an Open line; status, flag and stamps on a match |
+| Unmatched line of an in-scope account | Owner (Finance assigns, giving a line to someone; any worklist user claims an unassigned line), reason code, due date, and status among Open, Assigned and In Review | Worklist actions only, one line per action; bulk actions are deferred | Status to Assigned on assign or claim of an Open line; status, flag and stamps on a match |
 | Matched line, including Resolved weak-match rows | Nothing | None; read-only | Back to Open, flag and stamps cleared on unmatch; split and merge rules (REQ-06) |
 | Line of an excluded account | Nothing | Never listed | Creation default and release backfill only |
 | Reconciliation | Nothing | None | Completion time set on completion, cleared on reactivation |
 | Reason-code list | Codes and their wording, by users granted its maintenance screen | Its maintenance screen | None |
 
-The new fields are not made editable on existing screens such as the Bank Statement Lines tab.
+Existing screens such as the Bank Statement Lines tab get no editable new fields.
 
 ### 4.2 Phase 1, Data foundation
 
 #### 4.2.1 REQ-01: Exception status (F1)
 
 - Requirement: The system shall give every statement line a status of Open, Assigned, In Review or Resolved, treating new lines and a missing status as Open.
-- Sources: Analysis 1, Section 4.3; Analysis 2, Sections 3 and 3.1.
+- Sources: Analysis 1, Section 4.3; Analysis 2, Section 3; Analysis 2, Section 3.1.
 - Reused / new: Reuses the match-level list's pattern; the default (C-18) keeps bank file formats working.
 - Acceptance criteria:
   - Given a bank file, when a user imports it, then every new line is Open.
-  - Given an in-scope account's unmatched line with no status, when a worklist user who can read its organization opens the worklist, then the line shows Open.
+  - Given an in-scope account's unmatched line with no status, when a worklist user who can read its organization opens the worklist, then it shows Open.
 - Regression risk: Statement import (High).
 
 #### 4.2.2 REQ-02: Owner (F1)
 
 - Requirement: The system shall let every statement line carry at most one owner, a system user, starting with none.
-- Sources: Analysis 1, Sections 4.3 and 6; Analysis 2, Section 3.
+- Sources: Analysis 1, Section 4.3; Analysis 1, Section 6; Analysis 2, Section 3.
 - Reused / new: Reuses the system user record (`AD_USER`); adds the owner field.
 - Acceptance criteria:
   - Given a newly imported line, when a user views it, then it has no owner.
@@ -267,7 +270,7 @@ The new fields are not made editable on existing screens such as the Bank Statem
 #### 4.2.3 REQ-03: Reason code (F1)
 
 - Requirement: The system shall let every statement line carry at most one reason code from a company-maintained list, shipped with eight codes worded exactly: Bank fee, no transaction; Timing difference; Amount mismatch; Partner or reference mismatch; Duplicate; Payment missing in ERP; Wrong weak match; Other.
-- Sources: Analysis 1, Sections 4.3 and 6; Analysis 2, Section 3.
+- Sources: Analysis 1, Section 4.3; Analysis 1, Section 6; Analysis 2, Section 3.
 - Reused / new: Reuses the partner-guessing exclusion list's pattern; adds the list, its maintenance screen and the field (O-03).
 - Acceptance criteria:
   - Given a new installation, when an administrator opens the reason-code list, then it holds exactly these eight codes.
@@ -318,7 +321,7 @@ flowchart LR
 #### 4.2.6 REQ-06: Split and merge (F1)
 
 - Requirement: The system shall give a split's remainder the status, owner, reason code and due date the line had before the match, and keep the surviving line's values on a merge.
-- Sources: Analysis 1, Section 4.2; Analysis 2, Sections 3.1 and 4.2.
+- Sources: Analysis 1, Section 4.2; Analysis 2, Section 3.1; Analysis 2, Section 4.2.
 - Reused / new: Reuses the split, which copies the line before matching, and the merge, which keeps the line being unmatched.
 - Acceptance criteria:
   - Given an Assigned line with all four values, when a user splits it, then the remainder keeps them.
@@ -328,7 +331,7 @@ flowchart LR
 #### 4.2.7 REQ-07: Outside the processing lock (F1)
 
 - Requirement: The system shall write the new fields on processed and matched lines without changing the processing lock, let users change them only as the edit policy (Section 4.1.2) allows, and require them for no step from import to posting.
-- Sources: Analysis 1, Section 2.1, rows 14 and 24; Analysis 2, Sections 3 and 4.2.
+- Sources: Analysis 1, Section 2.1, rows 14 and 24; Analysis 2, Section 3; Analysis 2, Section 4.2.
 - Reused / new: Reuses the lock, which checks only the bank's own fields.
 - Acceptance criteria:
   - Given a processed, matched line, when the system writes its status, then the write succeeds and its amounts stay locked.
@@ -339,7 +342,7 @@ flowchart LR
 #### 4.2.8 REQ-08: Release backfill (F1)
 
 - Requirement: The system shall, at release, set every existing unmatched line on a processed statement, on any account, to Open with no owner or reason code, leaving other lines' status empty and no weak-match flag set.
-- Sources: Analysis 1, Sections 4.2 and 4.3; Analysis 2, Section 3.
+- Sources: Analysis 1, Section 4.2; Analysis 1, Section 4.3; Analysis 2, Section 3.
 - Reused / new: Adds a one-time, table-wide backfill (C-18), so carried-forward lines become Open exceptions.
 - Acceptance criteria:
   - Given an organization's unmatched processed lines on an in-scope account and a cash account, when the backfill runs, then both are Open and a worklist user who can read that organization sees only the first.
@@ -349,7 +352,7 @@ flowchart LR
 #### 4.2.9 REQ-09: Weak-match flag (F3)
 
 - Requirement: The system shall set the unconfirmed weak match flag whenever the rules link a line at the weak level, clear it on unmatch, and never set it on a manual match.
-- Sources: Analysis 1, Sections 3.3 and 5, item 3; Analysis 2, Sections 3 and 5.2, rank 4.
+- Sources: Analysis 1, Section 3.3; Analysis 1, Section 5, item 3; Analysis 2, Section 3; Analysis 2, Section 5.2, rank 4.
 - Reused / new: Reuses the weak level (`AP`, labelled "Approved", C-14); adds the flag, shown as "Unconfirmed weak match" (C-06, C-15, C-17).
 - Acceptance criteria:
   - Given a line only a fallback check matches, when automatic matching runs, then it is linked weakly and flagged.
@@ -360,7 +363,7 @@ flowchart LR
 #### 4.2.10 REQ-10: Match time and source (F4)
 
 - Requirement: The system shall record on every match its date, time and source (rules run from Match Statement, a user's search or add, or the scheduled job), clearing them on unmatch.
-- Sources: Analysis 1, Sections 6 and 7; Analysis 2, Sections 3 and 5.2, rank 6.
+- Sources: Analysis 1, Section 6; Analysis 1, Section 7; Analysis 2, Section 3; Analysis 2, Section 5.2, rank 6.
 - Reused / new: Reuses the single place every match is written; adds the fields (C-06).
 - Acceptance criteria:
   - Given an unmatched line, when a user links it by search, then it records the time and the source "user search or add".
@@ -369,8 +372,8 @@ flowchart LR
 
 #### 4.2.11 REQ-11: Completion time (F4)
 
-- Requirement: The system shall record the date and time of each completion made through the reconciliation completion process, clearing it on reactivation.
-- Sources: Analysis 1, Sections 6 and 7; Analysis 2, Section 5.2, rank 6.
+- Requirement: The system shall record the date and time of each completion through the reconciliation completion process, clearing it on reactivation.
+- Sources: Analysis 1, Section 6; Analysis 1, Section 7; Analysis 2, Section 5.2, rank 6.
 - Reused / new: Reuses the completion step (C-06); the older Reconciliation screen is excluded.
 - Acceptance criteria:
   - Given a draft reconciliation, when a user completes it with Reconcile All, then it records the completion time.
@@ -381,18 +384,18 @@ flowchart LR
 
 | Test | Gates | Harness |
 |---|---|---|
-| Split with status, owner, reason code, due date, flag and stamps filled | REQ-06, REQ-09, REQ-10 | JUnit in the standalone suite |
-| Merge on unmatch with the same fields filled | REQ-05, REQ-06 | JUnit in the standalone suite |
-| Unmatch setting Open with the owner kept, and clearing flag and stamps | REQ-05, REQ-09, REQ-10 | JUnit in the standalone suite |
+| Split with status, owner, reason code, due date, flag and stamps filled | REQ-06, REQ-09, REQ-10 | Standalone-suite JUnit |
+| Merge on unmatch with the same fields filled | REQ-05, REQ-06 | Standalone-suite JUnit |
+| Unmatch setting Open, keeping the owner and clearing flag and stamps | REQ-05, REQ-09, REQ-10 | Standalone-suite JUnit |
 
-No test refers to the matching utility (`APRM_MatchingUtility`) today, so these tests first pin today's behaviour (Analysis 2, Section 4.2).
+No test refers to the matching utility (`APRM_MatchingUtility`) today (Analysis 2, Section 4.2).
 
 ### 4.3 Phase 2, Visibility and follow-up
 
 #### 4.3.1 REQ-12: Age and age bands (F2)
 
 - Requirement: The system shall calculate, without storing it, each exception's age in whole calendar days from the bank's date for the line (`DATETRX`) to today, shown on the worklist, alerts and widget and grouped into administrator-set age bands.
-- Sources: Analysis 1, Sections 4.3 and 6; Analysis 2, Sections 3 and 5.1, rank 1.
+- Sources: Analysis 1, Section 4.3; Analysis 1, Section 6; Analysis 2, Section 3; Analysis 2, Section 5.1, rank 1.
 - Reused / new: Reuses the bank date; adds the bands (O-04).
 - Acceptance criteria:
   - Given a line whose bank date was yesterday, when a user opens the worklist, then its age shows one day.
@@ -402,7 +405,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.2 REQ-13: Cross-account worklist (F5)
 
 - Requirement: The system shall list on one worklist every unmatched processed line of in-scope accounts within the user's organizations, plus weak-flagged lines of draft reconciliations, showing account, bank date, amount, age, owner, status, reason code, due date and weak-match flag.
-- Sources: Analysis 1, Sections 4.1 and 5, item 1; Analysis 2, Sections 1.2 to 1.4 and 5.1, ranks 1 and 2.
+- Sources: Analysis 1, Section 4.1; Analysis 1, Section 5, item 1; Analysis 2, Section 1.2; Analysis 2, Section 1.3; Analysis 2, Section 1.4; Analysis 2, Section 5.1, ranks 1 and 2.
 - Reused / new: Reuses the Match Statement grid's HQL-based table pattern (`aprm_matchstatement`); adds a table, screen and menu entry (C-12, C-16, C-17).
 - Acceptance criteria:
   - Given a user whose worklist-granted role reads an organization with unmatched lines on two in-scope accounts, when they open the worklist, then both are listed.
@@ -413,7 +416,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.3 REQ-14: Worklist filters (F5)
 
 - Requirement: The system shall let worklist users filter by account, owner, status, reason code and age band.
-- Sources: Analysis 1, Section 4.1; Analysis 2, Sections 1.2 and 1.4.
+- Sources: Analysis 1, Section 4.1; Analysis 2, Section 1.2; Analysis 2, Section 1.4.
 - Reused / new: Reuses the grid's column filters and saved views; adds the age-band filter.
 - Acceptance criteria:
   - Given lines of several owners, when a user filters by their own name, then only their lines remain.
@@ -423,10 +426,10 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.4 REQ-15: Single-line edits (F5)
 
 - Requirement: The system shall let worklist users set the reason code, due date and status (Open, Assigned or In Review) of one unmatched line per action, make an Open line Assigned on assign or claim, and keep matched lines read-only to users.
-- Sources: Analysis 1, Sections 4.3 and 5, item 4; Analysis 2, Sections 1.2 and 1.4.
+- Sources: Analysis 1, Section 4.3; Analysis 1, Section 5, item 4; Analysis 2, Section 1.2; Analysis 2, Section 1.4.
 - Reused / new: Reuses Pick and Execute, limited to one line; adds the set actions (C-12, C-13, C-17).
 - Acceptance criteria:
-  - Given an Open line, when a worklist user sets its reason code, then the line shows that code.
+  - Given an Open line, when a worklist user sets its reason code, then it shows that code.
   - Given an unmatched line, when a user changes its status, then Resolved is not offered.
   - Given a Resolved weak-match row, when a user tries to change it, then the action is refused.
 - Regression risk: Roles and access (Medium).
@@ -434,7 +437,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.5 REQ-16: Assign and claim (F5)
 
 - Requirement: The system shall let Finance assign one line at a time, by a separately granted action, only to a user holding a worklist-granted role in the line's client (the top-level company grouping that owns the data) whose organization access covers the line's organization, let any worklist user claim an unassigned line they can see, and never assign automatically or change anyone's access.
-- Sources: Analysis 1, Sections 2.1 and 4.3; Analysis 2, Section 2.2.
+- Sources: Analysis 1, Section 2.1; Analysis 1, Section 4.3; Analysis 2, Section 2.2.
 - Reused / new: Reuses role grants and organization access, checked apart from the client.
 - Acceptance criteria:
   - Given an Open line, when Finance assigns it to a colleague whose worklist role covers its client and organization, then the colleague owns it and it is Assigned.
@@ -446,7 +449,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.6 REQ-17: Path to matching (F5)
 
 - Requirement: The system shall let a user open a worklist line's financial account, which offers Match Statement, or Match Transactions Force when an earlier reconciliation is the open draft, limited to lines dated up to that draft's end date.
-- Sources: Analysis 1, Section 1.3; Analysis 2, Sections 1.3 and 1.4.
+- Sources: Analysis 1, Section 1.3; Analysis 2, Section 1.3; Analysis 2, Section 1.4.
 - Reused / new: Reuses the process response that opens a record; adds the link but no way to close that draft (C-11).
 - Acceptance criteria:
   - Given no earlier open draft, when the user opens a line's account, then Match Statement is offered.
@@ -457,7 +460,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.7 REQ-18: Role grants (F5)
 
 - Requirement: The system shall control the worklist, its actions, the reason-code list, the alerts and the counts widget through role grants shipped to the standard Finance role, creating no new role.
-- Sources: Analysis 1, Section 2.1; Analysis 2, Sections 2.2 and 4.2.
+- Sources: Analysis 1, Section 2.1; Analysis 2, Section 2.2; Analysis 2, Section 4.2.
 - Reused / new: Reuses role grants and the Finance role, which lacks alert and widget grants today (O-06, U7).
 - Acceptance criteria:
   - Given a user holding only the Finance role, when they open the menu, then the worklist is offered.
@@ -467,7 +470,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.8 REQ-19: Aging alert (F6)
 
 - Requirement: The system shall once a day give each owner one on-screen alert per organization where they own lines past the age limit (5 calendar days by default, changeable by an administrator), with that organization's count and a worklist link, from one rule with an owner filter, sent to every worklist-granted role, without email.
-- Sources: Analysis 1, Sections 4.2 and 4.3; Analysis 2, Sections 2.2 and 5.1, rank 4.
+- Sources: Analysis 1, Section 4.2; Analysis 1, Section 4.3; Analysis 2, Section 2.2; Analysis 2, Section 5.1, rank 4.
 - Reused / new: Reuses the daily alert run and Alert Management; adds the rule and recipients (C-04).
 - Acceptance criteria:
   - Given an owner with lines past the limit in one organization, when alerts run, then they see one alert with the count and get no email.
@@ -478,7 +481,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.9 REQ-20: Unassigned digest (F6)
 
 - Requirement: The system shall once a day give the Finance role one on-screen digest per organization counting its unassigned unmatched lines, never one alert per line, with email following each recipient's send-email setting and holding only digests of organizations that role can read.
-- Sources: Analysis 1, Sections 4.2 and 4.3; Analysis 2, Sections 2.2 and 5.1, rank 4.
+- Sources: Analysis 1, Section 4.2; Analysis 1, Section 4.3; Analysis 2, Section 2.2; Analysis 2, Section 5.1, rank 4.
 - Reused / new: Reuses the alert run's email setting and organization filter; adds the rule (C-05).
 - Acceptance criteria:
   - Given a Finance user whose role reads one of two organizations with unassigned lines, when they open Alert Management, then they see one digest, with that organization's count.
@@ -488,7 +491,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 #### 4.3.10 REQ-21: Counts widget (F7)
 
 - Requirement: The system shall provide a counts widget showing open unmatched lines by age band, owner and reason code, granted by role and limited to organizations readable under the role in use.
-- Sources: Analysis 1, Section 4.1; Analysis 2, Sections 1.2 and 5.1, rank 5.
+- Sources: Analysis 1, Section 4.1; Analysis 2, Section 1.2; Analysis 2, Section 5.1, rank 5.
 - Reused / new: Reuses the Query/List widget and its grants; its query holds the organization limit (C-09, C-16).
 - Acceptance criteria:
   - Given lines in an organization the user's role cannot read, when the widget loads, then they are not counted.
@@ -511,7 +514,7 @@ No test refers to the matching utility (`APRM_MatchingUtility`) today, so these 
 |---|---|---|
 | Worklist query and each filter | REQ-13, REQ-14 | HQL datasource tests in the web-service suite, like `HQLDataSourceTest` |
 | Organization and role scoping on worklist, alerts and widget, including an owner with lines in two organizations under a role reading one (C-04) | REQ-18, REQ-19, REQ-21, NFR-02 | Role-scoped datasource tests like `DataSourceSecurity`, plus a new widget test (C-09) |
-| An assignment refused when the assignee has no worklist-granted role covering the line's client and organization | REQ-16 | JUnit |
+| Assignment refused when the proposed owner has no worklist-granted role covering the line's client and organization | REQ-16 | JUnit |
 | Aging and unassigned alert queries | REQ-19, REQ-20 | JUnit runs of the alert run (`AlertProcess`) on test data |
 | Reconcile warning response and its on-screen display | REQ-22 | JUnit on the response; a recorded manual check of the message and link (C-08) |
 
@@ -522,7 +525,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 #### 4.4.1 REQ-23: Shared matching logic (F9)
 
 - Requirement: The system shall run automatic matching through shared logic that Match Statement and the scheduled job both call, with today's rules and results unchanged and no dependence on an open screen.
-- Sources: Analysis 1, Sections 3.1 and 3.3; Analysis 2, Sections 2.2 and 5.1, rank 3.
+- Sources: Analysis 1, Section 3.1; Analysis 1, Section 3.3; Analysis 2, Section 2.2; Analysis 2, Section 5.1, rank 3.
 - Reused / new: Reuses today's rules and switches, moved out of the screen action.
 - Acceptance criteria:
   - Given fixed sample lines, when matching runs from Match Statement before and after the change, then every line gets the same link at the same level.
@@ -532,7 +535,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 #### 4.4.2 REQ-24: When matching runs (F9)
 
 - Requirement: The system shall run matching for an account right after each import of its statement and nightly for every bank account with a matching algorithm, skipping and logging every other account.
-- Sources: Analysis 1, Sections 3.3 and 5, item 5; Analysis 2, Sections 2.2 and 3.
+- Sources: Analysis 1, Section 3.3; Analysis 1, Section 5, item 5; Analysis 2, Section 2.2; Analysis 2, Section 3.
 - Reused / new: Reuses the scheduler and its run log; adds the job, ending before the alert run (O-07).
 - Acceptance criteria:
   - Given an in-scope account, when a user imports its statement, then matching runs without anyone opening Match Statement.
@@ -542,7 +545,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 #### 4.4.3 REQ-25: Job safeguards (F9)
 
 - Requirement: The system shall have the job reuse the account's draft reconciliation, create one only when it links a line, never complete a reconciliation, write the F3 flag and the F4 source "scheduled job", and leave alone any line a user is changing.
-- Sources: Analysis 1, Sections 1.3 and 4.4; Analysis 2, Sections 4.2 and 5.1, rank 3.
+- Sources: Analysis 1, Section 1.3; Analysis 1, Section 4.4; Analysis 2, Section 4.2; Analysis 2, Section 5.1, rank 3.
 - Reused / new: Reuses today's draft handling and the platform's per-record locking (C-10).
 - Acceptance criteria:
   - Given an account with a draft, when the job links lines, then it uses that draft, creates no other and completes none.
@@ -554,7 +557,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 
 | Test | Gates | Harness |
 |---|---|---|
-| Each matching pass of Analysis 1, Section 3.1 on fixed sample lines, before and after the move | REQ-23 | JUnit in the standalone suite |
+| Each matching pass of Analysis 1, Section 3.1 on fixed sample lines, before and after the move | REQ-23 | Standalone-suite JUnit |
 | The job: after-import start, skip of accounts without an algorithm, draft reuse, no completion, and a run beside a user matching the same account | REQ-24, REQ-25 | JUnit job runs like the process-scheduling test (`ProcessSchedulingTest`) |
 
 ## 5. Non-Functional Requirements
@@ -564,7 +567,7 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 #### 5.1.1 NFR-01: Speed at real volumes (F5, F7)
 
 - Requirement: The system shall load the worklist and the counts widget within a `TBD` time limit, set by timing the first rows on a copy of production holding the largest account's open lines.
-- Sources: Analysis 1, Section 7; Analysis 2, Sections 1.4 and 4.2.
+- Sources: Analysis 1, Section 7; Analysis 2, Section 1.4; Analysis 2, Section 4.2.
 - Reused / new: Reuses the grid timing Analysis 2, Section 4.2 suggests; volumes are unknown from code (U3).
 - Acceptance criteria:
   - Given the production copy, when a user opens the worklist, then its first rows appear within the limit.
@@ -574,8 +577,8 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 #### 5.1.2 NFR-02: Organization and role scoping (F5, F6, F7)
 
 - Requirement: The system shall scope the worklist, both alerts and the counts widget by role grants and organization access, so every count a user sees covers only organizations readable under the role in use.
-- Sources: Analysis 1, Section 2.1; Analysis 2, Sections 2.2 and 5.1, rank 5.
-- Reused / new: Reuses role grants and organization access; both alerts count per organization (C-04, C-05); the widget query holds the organization limit (C-09).
+- Sources: Analysis 1, Section 2.1; Analysis 2, Section 2.2; Analysis 2, Section 5.1, rank 5.
+- Reused / new: Reuses role grants and organization access; both alerts count per organization (C-04, C-05), and the widget query holds the limit (C-09).
 - Acceptance criteria:
   - Given a role reading one of two organizations, when its user opens the worklist, then only that organization's lines show.
   - Given a role reading one of two organizations, when its user opens the counts widget, then it counts only that organization's lines.
@@ -588,14 +591,14 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 - Sources: Analysis 1, Section 1.2; Analysis 2, Section 4.2.
 - Reused / new: Reuses posting unchanged; the job never completes or posts (REQ-25, U4, U5).
 - Acceptance criteria:
-  - Given the sample reconciliations the posting test (`RecordID2Test`) reposts, when it runs after each phase, then the balances are unchanged.
+  - Given the sample reconciliations `RecordID2Test` reposts, when it runs after each phase, then the balances are unchanged.
   - Given a reconciliation completed after release, when it is posted, then its entries equal those of the same lines completed before release.
 - Regression risk: Posting (High).
 
 #### 5.1.4 NFR-04: No change to the processing lock (F1)
 
 - Requirement: The system shall leave the processing-lock trigger (`APRM_FIN_BNKSTM_LINE_CHECK_TRG`) unchanged.
-- Sources: Analysis 1, Section 2.1; Analysis 2, Sections 3 and 4.2.
+- Sources: Analysis 1, Section 2.1; Analysis 2, Section 3; Analysis 2, Section 4.2.
 - Reused / new: Reuses the lock unchanged; REQ-07 relies on the new fields staying outside it.
 - Acceptance criteria:
   - Given a processed line, when a user changes its date, amount or reference, then the change is refused as today.
@@ -604,22 +607,28 @@ This gate draws on the Analysis 2, Section 4.2 mitigations (C-07).
 
 ## 6. Gap Closure for the Objective
 
-The objective reads: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." The six elements are those of Analysis 1, Section 6 (C-02). Support is Full when the code delivers and records an element, Partial for part, None otherwise.
+The objective reads: "Reduce manual effort and cycle time in bank reconciliation. Most statement lines are matched without human touch, and every unmatched item has an owner, age, and reason code." The six elements are those of Analysis 1, Section 6 (C-02). Support levels mean:
+
+| Support level | Meaning |
+|---|---|
+| Full | The code delivers and records the element |
+| Partial | Only part is delivered or recorded |
+| None | Neither |
 
 | Objective element | Support now | Support after this release | How this release changes it |
 |---|---|---|---|
 | Auto-match rate | Partial | Partial | F9 raises it; F3 and F4 make it measurable |
 | Owner | None | Full | F1, F5 and F6 give every exception an owner |
 | Age | Partial | Full | F2 shows it on the worklist, alerts and widget (F5, F6, F7) |
-| Reason code | None | Full | F1, F5 and F7 record and count it; it is never mandatory (REQ-07) |
-| Cycle time | None | Partial | F9 shortens waits, F4 records match and completion times, and F8 surfaces leftovers |
-| Manual effort | Partial | Partial | F5 and F9 cut manual touches; staff time is still unrecorded |
+| Reason code | None | Full | F1, F5 and F7 record and count it; never mandatory (REQ-07) |
+| Cycle time | None | Partial | F9 shortens waits; F4 records match and completion times; F8 surfaces leftovers |
+| Manual effort | Partial | Partial | F5 and F9 cut manual touches; staff time stays unrecorded |
 
-Auto-match rate and cycle time, enabled by F4, stay unmeasured until the deferred reporting ships. Their targets are O-01 and O-02.
+Auto-match rate and cycle time, enabled by F4, stay unmeasured until the deferred reporting ships (targets O-01, O-02).
 
 ## 7. Unconfirmed Items and Assumptions
 
-The seven unconfirmed facts and three assumptions keep their IDs from Project Guide, Section 1.4, as placed in Project Guide, Section 2.1; none is missing, and the guide's outdated counts are C-03.
+The seven unconfirmed facts and three assumptions keep their Project Guide, Section 1.4 IDs, as placed in Project Guide, Section 2.1; none is missing; the guide's outdated counts are C-03.
 
 | ID | Item | Raised in | Requirements affected |
 |---|---|---|---|
@@ -650,7 +659,7 @@ The seven unconfirmed facts and three assumptions keep their IDs from Project Gu
 
 ## 9. Handoff to Tickets
 
-Each requirement becomes at least one story, a delivery ticket, whose tests are its criteria unchanged. Stories follow phase order and are accepted only after their phase's gate passes, the manual check of C-08 included. Gate tests are their own stories, and tests of today's split, merge, unmatch and matching passes come before the stories that change them (Analysis 2, Section 6).
+Each requirement becomes at least one story, a delivery ticket, whose tests are its criteria unchanged. Stories follow phase order and are accepted only after their phase's gate passes, the manual check of C-08 included. Tests of today's split, merge, unmatch and matching passes come before the stories that change them (Analysis 2, Section 6).
 
 | REQ IDs | Minimum stories | Phase | Gate before acceptance |
 |---|---|---|---|
@@ -662,13 +671,13 @@ Each requirement becomes at least one story, a delivery ticket, whose tests are 
 
 ## Appendix A. Glossary
 
-Existing terms are confirmed by the code cited, `...` marking omitted folders; Proposed terms come from the requirement or source cited.
+Existing terms cite confirming code, `...` marking omitted folders; Proposed terms cite their requirement or source.
 
 | Term | Plain meaning | Basis |
 |---|---|---|
 | Age, age band | Whole calendar days since the bank's date for the line; a range of ages used to group lines | Proposed (REQ-12), from the bank date `.../tables/FIN_BANKSTATEMENTLINE.xml:52` |
 | Alert, alert rule, Alert Management | A system-generated on-screen to-do message sent to a user or role; the saved query that raises alerts; the screen listing a user's alerts | Existing: `.../tables/AD_ALERT.xml:3`; `.../tables/AD_ALERTRULE.xml:3`; `.../ADAlertDatasourceService.java:96-121` |
-| Auto-match rate, cycle time, manual effort | The share of statement lines matched with no person acting; the time from statement import to completed reconciliation; the staff work reconciliation takes | Proposed: Analysis 1, Sections 1.1 and 6; not measured in code today |
+| Auto-match rate, cycle time, manual effort | The share of statement lines matched with no person acting; the time from statement import to completed reconciliation; the staff work reconciliation takes | Proposed: Analysis 1, Section 1.1; Analysis 1, Section 6; not measured in code today |
 | Backfill | Filling a new field for rows that already exist | Proposed (REQ-08) |
 | Carry forward, carried-forward line | Leaving unmatched lines open when a reconciliation completes, so they reappear next period; such a line | Existing: Analysis 1, Section 4.2; `.../FIN_ReconciliationProcess.java:99-106`; `.../MatchStatementTransformer.java:63-78` |
 | Client | The top-level company grouping that owns the data | Existing: `.../SecurityChecker.java:139-178` |
